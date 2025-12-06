@@ -11,7 +11,7 @@ import { allQuestions } from '@/data/questions';
 import { Answer } from '@/types/diagnosis';
 import { Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const QUESTIONS_PER_PAGE = 5;
+const QUESTIONS_PER_PAGE = 10;
 const scaleLabels = [
   { value: 5, label: '非常に当てはまる' },
   { value: 4, label: 'やや当てはまる' },
