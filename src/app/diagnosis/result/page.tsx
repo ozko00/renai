@@ -117,17 +117,6 @@ export default function DiagnosisResultPage() {
           <p className="text-gray-600">あなたの恋愛タイプが明らかになりました</p>
         </div>
 
-        {/* Compatibility CTA - Top */}
-        <div className="bg-gradient-to-r from-rose-100 to-pink-100 rounded-xl p-6 mb-8 text-center">
-          <p className="text-gray-700 mb-3">あなたと相性の良いタイプを調べよう</p>
-          <Link href="/compatibility">
-            <Button size="lg" className="bg-rose-500 hover:bg-rose-600 shadow-lg">
-              <Users className="mr-2 h-5 w-5" />
-              相性を診断する
-            </Button>
-          </Link>
-        </div>
-
         {/* Main Types */}
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {/* Attachment Type */}
@@ -285,6 +274,17 @@ export default function DiagnosisResultPage() {
             </ul>
           </CardContent>
         </Card>
+
+        {/* Compatibility CTA */}
+        <div className="bg-gradient-to-r from-rose-100 to-pink-100 rounded-xl p-6 mb-8 text-center">
+          <p className="text-gray-700 mb-3">あなたと相性の良いタイプを調べよう</p>
+          <Link href="/compatibility">
+            <Button size="lg" className="bg-rose-500 hover:bg-rose-600 shadow-lg">
+              <Users className="mr-2 h-5 w-5" />
+              相性を診断する
+            </Button>
+          </Link>
+        </div>
 
         {/* About Attachment Styles */}
         <Card className="mb-6">
