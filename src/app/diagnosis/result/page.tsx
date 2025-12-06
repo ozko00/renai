@@ -60,22 +60,10 @@ export default function DiagnosisResultPage() {
   const attachmentInfo = attachmentTypeInfo[attachmentType];
   const loveStyleInfo = loveStyleTypeInfo[loveStyleType];
 
-  const handleShare = (platform: 'twitter' | 'line') => {
-    const text = `私の恋愛タイプは「${attachmentInfo.name}」×「${loveStyleInfo.name}」でした！\n\n恋愛タイプ診断で自分の恋愛パターンを分析してみよう`;
-    const url = window.location.origin;
-
-    if (platform === 'twitter') {
-      window.open(
-        `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-        '_blank'
-      );
-    } else {
-      window.open(
-        `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-        '_blank'
-      );
-    }
-  };
+  const shareText = `私の恋愛タイプは「${attachmentInfo.name}」×「${loveStyleInfo.name}」でした！\n\n恋愛タイプ診断で自分の恋愛パターンを分析してみよう`;
+  const shareUrl = typeof window !== 'undefined' ? window.location.origin : '';
+  const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+  const lineShareUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-rose-50 to-white">
@@ -90,21 +78,25 @@ export default function DiagnosisResultPage() {
             トップへ
           </Link>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleShare('twitter')}
+            <a
+              href={twitterShareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              <Share2 className="h-4 w-4 mr-1" />
-              Twitter
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleShare('line')}
+              <Button variant="outline" size="sm">
+                <Share2 className="h-4 w-4 mr-1" />
+                Twitter
+              </Button>
+            </a>
+            <a
+              href={lineShareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
             >
-              LINE
-            </Button>
+              <Button variant="outline" size="sm">
+                LINE
+              </Button>
+            </a>
           </div>
         </div>
       </header>
