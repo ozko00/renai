@@ -158,3 +158,88 @@
     font-family: var(--font-zen-maru-gothic), "Hiragino Maru Gothic ProN", system-ui, sans-serif;
   }
 }
+
+/* ─────────────────────────────────────────────
+   Hero ambient animations (used in /diagnosis/start)
+   ───────────────────────────────────────────── */
+@keyframes koi-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.06); opacity: 0.85; }
+}
+
+@keyframes koi-float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
+
+@keyframes koi-letter {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50%      { transform: translateY(-4px) rotate(2deg); }
+}
+
+@keyframes koi-twinkle {
+  0%, 100% { opacity: 0.35; transform: scale(0.85) rotate(0deg); }
+  50%      { opacity: 1;    transform: scale(1.1)  rotate(180deg); }
+}
+
+@keyframes koi-rise {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.koi-anim-breathe { animation: koi-breathe 6s ease-in-out infinite; will-change: transform; }
+.koi-anim-float   { animation: koi-float   5s ease-in-out infinite; will-change: transform; }
+.koi-anim-letter  { animation: koi-letter  4s ease-in-out infinite; will-change: transform; transform-origin: 50% 60%; }
+.koi-anim-twinkle { animation: koi-twinkle var(--koi-twinkle-duration, 2.8s) ease-in-out var(--koi-twinkle-delay, 0s) infinite; will-change: transform, opacity; }
+.koi-anim-rise    { animation: koi-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) var(--koi-rise-delay, 0s) both; }
+
+/* ─────────────────────────────────────────────
+   Spinning globe loading indicator
+   ───────────────────────────────────────────── */
+@keyframes koi-globe-spin {
+  /* Country mass tile shifts left by 120 (= globe diameter) for seamless loop */
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-120px); }
+}
+
+@keyframes koi-globe-rotate-cw {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes koi-globe-rotate-ccw {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(-360deg); }
+}
+
+.koi-globe-rotate {
+  animation: koi-globe-spin 12s linear infinite;
+  will-change: transform;
+}
+
+.koi-globe-whirl-cw {
+  animation: koi-globe-rotate-cw 8s linear infinite;
+  transform-origin: 100px 100px;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+.koi-globe-whirl-ccw {
+  animation: koi-globe-rotate-ccw 14s linear infinite;
+  transform-origin: 100px 100px;
+  transform-box: fill-box;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .koi-anim-breathe,
+  .koi-anim-float,
+  .koi-anim-letter,
+  .koi-anim-twinkle,
+  .koi-anim-rise,
+  .koi-globe-rotate,
+  .koi-globe-whirl-cw,
+  .koi-globe-whirl-ccw {
+    animation: none !important;
+  }
+}
