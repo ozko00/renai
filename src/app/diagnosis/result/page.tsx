@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { DiagnosisResult } from '@/types/diagnosis';
-import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+import { renAITypes } from '@/data/types/renAITypes';
 import AxisScoreBar from '@/components/result/AxisScoreBar';
+import { CharacterImage } from '@/components/result/CharacterImage';
 import {
   isLegacyResult,
   migrateLegacyResult,
@@ -13,6 +14,17 @@ import {
 import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const RESULT_STORAGE_KEY = 'diagnosisResult';
+
+// 既存 localStorage 内に「(PS:-0.17)」のような軸スコアの生値が混入している場合があるため、
+// 表示時にもサーバ側と同じパターンで除去する (ユーザーは再診断不要)。
+function stripAxisDebugTokens(text: string): string {
+  return text
+    .replace(/[（(]\s*(?:LF|PS|WA|IE)\s*[:：]\s*[+\-]?\d+(?:\.\d+)?\s*[）)]/g, '')
+    .replace(/(?:LF|PS|WA|IE)\s*[:：]\s*[+\-]?\d+(?:\.\d+)?/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([、。」])/g, '$1')
+    .trim();
+}
 
 function ChevronLeftIcon({ className = '' }: { className?: string }) {
   return (
@@ -88,8 +100,14 @@ export default function DiagnosisResultPage() {
     if (stored === null) return null;
     try {
       const parsed: unknown = JSON.parse(stored);
-      if (isDiagnosisResult(parsed)) return parsed;
-      return null;
+      if (!isDiagnosisResult(parsed)) return null;
+      return {
+        ...parsed,
+        summary: stripAxisDebugTokens(parsed.summary),
+        advice: parsed.advice
+          .map(stripAxisDebugTokens)
+          .filter((a) => a.length > 0),
+      };
     } catch {
       return null;
     }
@@ -146,7 +164,7 @@ export default function DiagnosisResultPage() {
     );
   }
 
-  const type = koigokoroTypes[result.code];
+  const type = renAITypes[result.code];
   const accent = type.tone;
 
   return (
@@ -168,40 +186,47 @@ export default function DiagnosisResultPage() {
       </header>
 
       <div className="mx-auto w-full max-w-2xl px-5 pb-16 sm:px-7">
-        {/* Type hero */}
+        {/* Character card — full-bleed image + bottom overlay text */}
         <article
-          className="relative mt-4 overflow-hidden rounded-[28px] p-7 shadow-[0_4px_24px_var(--koi-line)] sm:p-9"
-          style={{
-            background:
-              'linear-gradient(180deg, var(--koi-bg-card) 0%, var(--koi-bg-soft) 100%)',
-          }}
+          className="relative mt-4 aspect-[4/5] w-full overflow-hidden rounded-[32px] bg-[var(--koi-bg-card)] shadow-[0_8px_32px_var(--koi-line)]"
         >
-          <div
-            className="absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-50 blur-2xl"
-            style={{ background: accent }}
-            aria-hidden
-          />
-          <div
-            className="absolute -bottom-12 -left-12 h-44 w-44 rounded-full opacity-40 blur-3xl"
-            style={{ background: 'var(--koi-primary-soft)' }}
-            aria-hidden
+          {/* Image layer — fills the entire card */}
+          <CharacterImage
+            code={result.code}
+            axes={result.axes}
+            emoji={result.emoji}
+            className="absolute inset-0 h-full w-full"
           />
 
-          <div className="relative">
-            <div className="font-mono text-[10px] tracking-[0.28em] text-[var(--koi-ink-soft)]">
-              YOUR TYPE · {result.code}
-            </div>
+          {/* Bottom gradient mask — fades into card background for text readability */}
+          <div
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-[58%]"
+            style={{
+              background:
+                'linear-gradient(to top, var(--koi-bg-card) 0%, var(--koi-bg-card) 30%, rgba(255,255,255,0.78) 55%, rgba(255,255,255,0.35) 78%, transparent 100%)',
+            }}
+            aria-hidden
+          />
 
-            <div
-              className="mt-6 flex h-24 w-24 items-center justify-center rounded-full text-[42px] shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
-              style={{ background: 'var(--koi-bg-card)' }}
-              aria-hidden
-            >
-              {result.emoji}
-            </div>
+          {/* Top gradient mask — softens the top edge for the type code chip */}
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-[18%]"
+            style={{
+              background:
+                'linear-gradient(to bottom, rgba(255,255,255,0.7) 0%, transparent 100%)',
+            }}
+            aria-hidden
+          />
 
+          {/* Type code chip */}
+          <div className="absolute left-6 top-5 z-10 font-mono text-[10px] tracking-[0.28em] text-[var(--koi-ink-soft)]">
+            YOUR TYPE · {result.code}
+          </div>
+
+          {/* Title block — overlays the gradient */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 px-7 pb-9 pt-6 text-center">
             <h1
-              className="font-serif-jp mt-6 text-[34px] font-medium leading-[1.2] tracking-[-0.01em] sm:text-[42px]"
+              className="font-serif-jp text-[34px] font-medium leading-[1.2] tracking-[-0.01em] sm:text-[42px]"
               style={{ color: accent }}
             >
               {type.name}
@@ -209,11 +234,14 @@ export default function DiagnosisResultPage() {
             <p className="mt-2 text-[13px] tracking-[0.04em] text-[var(--koi-ink-soft)]">
               {type.short}
             </p>
-
-            <p className="mt-6 text-[14px] leading-[1.95] text-[var(--koi-ink)]">
-              {result.summary}
-            </p>
           </div>
+        </article>
+
+        {/* Summary */}
+        <article className="relative mt-5 overflow-hidden rounded-[24px] bg-[var(--koi-bg-card)] p-7 shadow-[0_2px_12px_var(--koi-line)] sm:p-8">
+          <p className="text-[14px] leading-[1.95] text-[var(--koi-ink)]">
+            {result.summary}
+          </p>
         </article>
 
         {/* Compatibility CTA — top */}
