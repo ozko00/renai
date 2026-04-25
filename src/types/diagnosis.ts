@@ -1,8 +1,8 @@
 // 4 軸 (LF=主導/受容, PS=情熱/安定, WA=言葉/行動, IE=自由/一途)
-export type KoigokoroAxis = 'LF' | 'PS' | 'WA' | 'IE';
+export type RenAIAxis = 'LF' | 'PS' | 'WA' | 'IE';
 
 // 16 タイプコード (各軸の前者を選んだ場合のみ L/P/W/I、後者なら F/S/A/E)
-export type KoigokoroCode =
+export type RenAICode =
   | 'LPWI' | 'LPWE' | 'LPAI' | 'LPAE'
   | 'LSWI' | 'LSWE' | 'LSAI' | 'LSAE'
   | 'FPWI' | 'FPWE' | 'FPAI' | 'FPAE'
@@ -14,7 +14,7 @@ export type LikertValue = 1 | 2 | 3 | 4 | 5;
 // 質問
 export interface AxisQuestion {
   id: number;
-  axis: KoigokoroAxis;
+  axis: RenAIAxis;
   text: string;
   // reverse=true なら値を反転して集計 (現状は全問 reverse=false)
   reverse?: boolean;
@@ -24,11 +24,11 @@ export interface AxisQuestion {
 export type AxisAnswers = Record<number, LikertValue>;
 
 // 各軸のスコア (-1.0 .. +1.0、+方向 = 軸前者)
-export type AxisScores = Record<KoigokoroAxis, number>;
+export type AxisScores = Record<RenAIAxis, number>;
 
 // 16 タイプ情報
-export interface KoigokoroType {
-  code: KoigokoroCode;
+export interface RenAIType {
+  code: RenAICode;
   name: string;
   emoji: string;
   tone: string; // tone color hex
@@ -39,7 +39,7 @@ export interface KoigokoroType {
 // 診断結果 (新スキーマ v2)
 export interface DiagnosisResult {
   version: 2;
-  code: KoigokoroCode;
+  code: RenAICode;
   name: string;
   emoji: string;
   axes: AxisScores;
@@ -64,7 +64,7 @@ export interface LegacyDiagnosisResult {
 
 // 相性診断結果
 export interface CompatibilityAxisAnalysis {
-  axis: KoigokoroAxis;
+  axis: RenAIAxis;
   match: boolean;
   selfLabel: string;
   otherLabel: string;
@@ -72,8 +72,8 @@ export interface CompatibilityAxisAnalysis {
 }
 
 export interface CompatibilityResult {
-  selfCode: KoigokoroCode;
-  otherCode: KoigokoroCode;
+  selfCode: RenAICode;
+  otherCode: RenAICode;
   score: number; // 0..100
   tone: string;
   axes: CompatibilityAxisAnalysis[];

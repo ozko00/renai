@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { axisQuestions } from '@/data/questions/axisQuestions';
 import { LikertValue } from '@/types/diagnosis';
 import { useHydrated } from '@/lib/hooks/useHydrated';
 
-const ANSWERS_STORAGE_KEY = 'koigokoroAnswers';
+const ANSWERS_STORAGE_KEY = 'renAIAnswers';
 
 const SCALE_OPTIONS: ReadonlyArray<{
   value: LikertValue;
@@ -164,6 +164,9 @@ export default function QuestionForm() {
   // sessionStorage 由来の resume 位置に切り替える。
   const resumeIndex = mounted ? computeFirstUnansweredIndex(answers) : 0;
   const [userOffset, setUserOffset] = useState<number>(0);
+  // 直前に選択した値を保持して、遷移までの間「✓ 選択しました」フィードバックを表示する
+  const [justAnswered, setJustAnswered] = useState<LikertValue | null>(null);
+  const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const index = Math.min(Math.max(resumeIndex + userOffset, 0), TOTAL - 1);
   const question = axisQuestions[index];
@@ -172,25 +175,44 @@ export default function QuestionForm() {
   const progress = ((index + 1) / TOTAL) * 100;
   const isLast = index === TOTAL - 1;
 
+  // 質問が切り替わったらフィードバック状態をリセット
+  useEffect(() => {
+    setJustAnswered(null);
+  }, [index]);
+
+  // アンマウント時にタイマーを掃除
+  useEffect(() => {
+    return () => {
+      if (advanceTimerRef.current) clearTimeout(advanceTimerRef.current);
+    };
+  }, []);
+
   const handleAnswer = (value: LikertValue) => {
     if (!question) return;
+    // 連打中は無視 (二重遷移防止)
+    if (justAnswered !== null) return;
+
     const next = { ...answers, [question.id]: value };
     writeAnswers(next);
+    setJustAnswered(value);
 
     if (isLast) {
       const allAnswered = axisQuestions.every(
         (q) => next[q.id] !== undefined
       );
       if (allAnswered) {
-        router.push('/diagnosis/loading');
+        // 最後の問題でも選択フィードバックを見せてからローディングへ
+        advanceTimerRef.current = setTimeout(() => {
+          router.push('/diagnosis/loading');
+        }, 520);
         return;
       }
     }
-    setTimeout(() => {
+    advanceTimerRef.current = setTimeout(() => {
       const newResume = computeFirstUnansweredIndex(next);
       const targetIndex = Math.min(index + 1, TOTAL - 1);
       setUserOffset(targetIndex - newResume);
-    }, 220);
+    }, 520);
   };
 
   const handlePrev = () => {
@@ -277,7 +299,10 @@ export default function QuestionForm() {
       >
         {SCALE_OPTIONS.map(({ value, label, size }) => {
           const isSelected = selected === value;
+          const isJustAnswered = justAnswered === value;
           const isCenter = value === 3;
+          // 直前選択中は他のオプションを少し控えめに
+          const isDimmed = justAnswered !== null && !isJustAnswered;
           return (
             <div
               key={value}
@@ -289,7 +314,7 @@ export default function QuestionForm() {
                 aria-checked={isSelected}
                 aria-label={label.replace('\n', '')}
                 onClick={() => handleAnswer(value)}
-                className="flex items-center justify-center rounded-full transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--koi-primary-deep)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--koi-bg)]"
+                className="flex items-center justify-center rounded-full transition-all duration-300 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--koi-primary-deep)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--koi-bg)]"
                 style={{
                   width: size,
                   height: size,
@@ -299,15 +324,31 @@ export default function QuestionForm() {
                   border: isSelected
                     ? 'none'
                     : `1.5px solid ${isCenter ? 'var(--koi-line)' : 'var(--koi-primary-soft)'}`,
-                  boxShadow: isSelected
-                    ? '0 6px 16px var(--koi-primary-soft)'
-                    : 'none',
+                  boxShadow: isJustAnswered
+                    ? '0 0 0 4px var(--koi-primary-soft), 0 10px 24px var(--koi-primary-soft)'
+                    : isSelected
+                      ? '0 6px 16px var(--koi-primary-soft)'
+                      : 'none',
                   color: '#fff',
+                  transform: isJustAnswered
+                    ? 'scale(1.18)'
+                    : isDimmed
+                      ? 'scale(0.92)'
+                      : 'scale(1)',
+                  opacity: isDimmed ? 0.4 : 1,
                 }}
               >
                 {isSelected && <CheckIcon className="h-4 w-4" aria-hidden />}
               </button>
-              <span className="whitespace-pre-line text-center text-[9px] leading-[1.3] text-[var(--koi-ink-muted)] sm:text-[10px]">
+              <span
+                className="whitespace-pre-line text-center text-[9px] leading-[1.3] transition-colors sm:text-[10px]"
+                style={{
+                  color: isJustAnswered
+                    ? 'var(--koi-primary-deep)'
+                    : 'var(--koi-ink-muted)',
+                  fontWeight: isJustAnswered ? 600 : 400,
+                }}
+              >
                 {label}
               </span>
             </div>
@@ -316,8 +357,18 @@ export default function QuestionForm() {
       </div>
 
       {/* Hint */}
-      <p className="mt-12 text-center text-[11px] text-[var(--koi-ink-muted)]">
-        直感で選んでください
+      <p
+        className="mt-12 text-center text-[11px] transition-colors"
+        aria-live="polite"
+        style={{
+          color:
+            justAnswered !== null
+              ? 'var(--koi-primary-deep)'
+              : 'var(--koi-ink-muted)',
+          fontWeight: justAnswered !== null ? 500 : 400,
+        }}
+      >
+        {justAnswered !== null ? '✓ 選択しました' : '直感で選んでください'}
       </p>
     </div>
   );

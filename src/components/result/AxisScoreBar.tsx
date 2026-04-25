@@ -1,15 +1,15 @@
-import type { AxisScores, KoigokoroAxis } from '@/types/diagnosis';
-import { axisLabels } from '@/data/types/koigokoroTypes';
+import type { AxisScores, RenAIAxis } from '@/types/diagnosis';
+import { axisLabels } from '@/data/types/renAITypes';
 import { axisStrengthPercent } from '@/lib/utils/scoring';
 
 interface AxisScoreBarProps {
   axes: AxisScores;
 }
 
-const AXIS_ORDER: ReadonlyArray<KoigokoroAxis> = ['LF', 'PS', 'WA', 'IE'];
+const AXIS_ORDER: ReadonlyArray<RenAIAxis> = ['LF', 'PS', 'WA', 'IE'];
 
 const AXIS_META: Record<
-  KoigokoroAxis,
+  RenAIAxis,
   { eyebrow: string; positiveLetter: string; negativeLetter: string }
 > = {
   LF: { eyebrow: 'AXIS 01', positiveLetter: 'L', negativeLetter: 'F' },

@@ -8,7 +8,7 @@ import {
 } from '@/lib/gemini';
 import { calculateAxisScores, codeFromAxes } from '@/lib/utils/scoring';
 import { buildDiagnosisPrompt } from '@/lib/prompts/diagnosisPrompt';
-import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+import { renAITypes } from '@/data/types/renAITypes';
 import { AxisAnswers, DiagnosisResult, LikertValue } from '@/types/diagnosis';
 
 type RateLimitEntry = { count: number; resetAt: number };
@@ -65,6 +65,17 @@ function parseAnswers(input: unknown): AxisAnswers | null {
 const SYSTEM_INSTRUCTION =
   'あなたは恋愛心理学に詳しい優しいカウンセラーです。出力は必ず指定された JSON 形式のみで返します。';
 
+// LLM が稀に「(PS:-0.17)」のような軸スコア生値を文章に埋め込むことがあるため除去する。
+// 例: "安定を求める傾向（PS:-0.17）と" → "安定を求める傾向と"
+function stripAxisDebugTokens(text: string): string {
+  return text
+    .replace(/[（(]\s*(?:LF|PS|WA|IE)\s*[:：]\s*[+\-]?\d+(?:\.\d+)?\s*[）)]/g, '')
+    .replace(/(?:LF|PS|WA|IE)\s*[:：]\s*[+\-]?\d+(?:\.\d+)?/g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([、。」])/g, '$1')
+    .trim();
+}
+
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -106,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     const axes = calculateAxisScores(answers);
     const code = codeFromAxes(axes);
-    const type = koigokoroTypes[code];
+    const type = renAITypes[code];
 
     const prompt = buildDiagnosisPrompt(code, axes);
 
@@ -132,10 +143,13 @@ export async function POST(request: NextRequest) {
     const parsed = JSON.parse(content) as { summary?: string; advice?: unknown };
     const summary =
       typeof parsed.summary === 'string' && parsed.summary.length > 0
-        ? parsed.summary
+        ? stripAxisDebugTokens(parsed.summary)
         : type.desc;
     const advice = Array.isArray(parsed.advice)
-      ? parsed.advice.filter((a): a is string => typeof a === 'string')
+      ? parsed.advice
+          .filter((a): a is string => typeof a === 'string')
+          .map(stripAxisDebugTokens)
+          .filter((a) => a.length > 0)
       : [];
 
     const result: DiagnosisResult = {

@@ -5,20 +5,20 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type {
   CompatibilityResult,
-  KoigokoroCode,
+  RenAICode,
 } from '@/types/diagnosis';
-import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+import { renAITypes } from '@/data/types/renAITypes';
 import {
   calculateCompatibility,
-  isKoigokoroCode,
+  isRenAICode,
 } from '@/lib/utils/compatibility';
 import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const COMPATIBILITY_STORAGE_KEY = 'compatibilityRequest';
 
 interface StoredRequest {
-  selfCode: KoigokoroCode;
-  otherCode: KoigokoroCode;
+  selfCode: RenAICode;
+  otherCode: RenAICode;
 }
 
 function ChevronLeftIcon({ className = '' }: { className?: string }) {
@@ -52,7 +52,7 @@ function parseRequest(raw: string | null): StoredRequest | null {
     const parsed = JSON.parse(raw) as unknown;
     if (!parsed || typeof parsed !== 'object') return null;
     const obj = parsed as Record<string, unknown>;
-    if (!isKoigokoroCode(obj.selfCode) || !isKoigokoroCode(obj.otherCode)) {
+    if (!isRenAICode(obj.selfCode) || !isRenAICode(obj.otherCode)) {
       return null;
     }
     return { selfCode: obj.selfCode, otherCode: obj.otherCode };
@@ -129,8 +129,8 @@ export default function CompatibilityResultPage() {
     );
   }
 
-  const selfType = koigokoroTypes[result.selfCode];
-  const otherType = koigokoroTypes[result.otherCode];
+  const selfType = renAITypes[result.selfCode];
+  const otherType = renAITypes[result.otherCode];
 
   return (
     <main className="min-h-screen bg-[var(--koi-bg-soft)] text-[var(--koi-ink)]">

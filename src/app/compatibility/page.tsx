@@ -3,9 +3,9 @@
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { DiagnosisResult, KoigokoroCode } from '@/types/diagnosis';
-import { koigokoroTypeList } from '@/data/types/koigokoroTypes';
-import { isKoigokoroCode } from '@/lib/utils/compatibility';
+import type { DiagnosisResult, RenAICode } from '@/types/diagnosis';
+import { renAITypeList } from '@/data/types/renAITypes';
+import { isRenAICode } from '@/lib/utils/compatibility';
 import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const RESULT_STORAGE_KEY = 'diagnosisResult';
@@ -93,9 +93,9 @@ export default function CompatibilityPage() {
   const hydrated = useHydrated();
   // SSR/初回ハイドレートでは常に null を表示し、ハイドレート完了後にだけ実体を出す
   const self = hydrated ? storedSelf : null;
-  const [otherCode, setOtherCode] = useState<KoigokoroCode | null>(null);
+  const [otherCode, setOtherCode] = useState<RenAICode | null>(null);
 
-  const sortedTypes = useMemo(() => koigokoroTypeList, []);
+  const sortedTypes = useMemo(() => renAITypeList, []);
 
   const canSubmit = !!self && !!otherCode;
 
@@ -211,7 +211,7 @@ export default function CompatibilityPage() {
                     role="radio"
                     aria-checked={isSelected}
                     onClick={() => {
-                      if (isKoigokoroCode(type.code)) {
+                      if (isRenAICode(type.code)) {
                         setOtherCode(type.code);
                       }
                     }}

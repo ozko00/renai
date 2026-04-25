@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 function PastelBlobs() {
   return (
@@ -69,6 +70,40 @@ const TIPS: Array<[string, string]> = [
   ['正解はない', 'シェアは任意'],
 ];
 
+const CHARACTER_SAMPLES: Array<{
+  src: string;
+  alt: string;
+  code: string;
+  name: string;
+  caption: string;
+  cardBg: string;
+}> = [
+  {
+    src: '/characters/lion-hero.png',
+    alt: 'タイプ LPWI「太陽の恋人」のライオンキャラクター',
+    code: 'LPWI',
+    name: '太陽の恋人',
+    caption: '輝いて誘う人',
+    cardBg: 'linear-gradient(180deg, #FFF6E5 0%, #FFE9D6 100%)',
+  },
+  {
+    src: '/characters/duck-wink.png',
+    alt: 'タイプ FSAE「湖の番人」のアヒルキャラクター',
+    code: 'FSAE',
+    name: '湖の番人',
+    caption: '静かに守る人',
+    cardBg: 'linear-gradient(180deg, #FFEAEA 0%, #F8DDDB 100%)',
+  },
+  {
+    src: '/characters/duck-cozy.png',
+    alt: 'タイプ FSAE「湖の番人」のアヒル — 穏やかな表情',
+    code: 'FSAE',
+    name: '湖の番人',
+    caption: '穏やかに包む人',
+    cardBg: 'linear-gradient(180deg, #FFF1E0 0%, #FCE2C8 100%)',
+  },
+];
+
 const AXES: Array<{ tag: string; count: string; text: string }> = [
   {
     tag: '主導 / 受容',
@@ -103,7 +138,7 @@ export default function Home() {
           <HeartIcon className="h-3.5 w-3.5" />
         </span>
         <span className="font-serif-jp text-[15px] font-medium tracking-[0.08em]">
-          koigokoro
+          renAI
         </span>
       </header>
 
@@ -144,6 +179,76 @@ export default function Home() {
             16タイプを見る →
           </Link>
         </div>
+      </section>
+
+      {/* Character gallery — sample of the AI-generated personas */}
+      <section
+        id="characters"
+        className="relative mx-auto w-full max-w-2xl px-7 py-10"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <div>
+            <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+              CHARACTERS
+            </div>
+            <h2 className="font-serif-jp mt-1.5 text-[22px] font-medium leading-[1.4]">
+              あなただけの
+              <br />
+              キャラクターが届きます
+            </h2>
+          </div>
+          <SparkleIcon className="h-3 w-3 flex-shrink-0 text-[var(--koi-primary-deep)]" />
+        </div>
+
+        <p className="mt-3 max-w-md text-[13px] leading-[1.85] text-[var(--koi-ink-soft)]">
+          診断結果に応じて、16 タイプそれぞれの動物キャラクターが
+          AI で描き起こされます。あなたの軸の傾きに合わせて、
+          表情やポーズも少しずつ変わります。
+        </p>
+
+        {/* Gallery grid */}
+        <div className="mt-7 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
+          {CHARACTER_SAMPLES.map((sample, i) => (
+            <figure
+              key={`${sample.code}-${i}`}
+              className="relative aspect-[5/6] overflow-hidden rounded-2xl shadow-[0_4px_18px_var(--koi-line)] transition-transform hover:-translate-y-0.5"
+              style={{ background: sample.cardBg }}
+            >
+              <Image
+                src={sample.src}
+                alt={sample.alt}
+                fill
+                sizes="(min-width: 640px) 200px, 45vw"
+                className="object-contain"
+                priority={i === 0}
+              />
+              {/* Bottom gradient + caption */}
+              <div
+                className="pointer-events-none absolute inset-x-0 bottom-0 h-[42%]"
+                style={{
+                  background:
+                    'linear-gradient(to top, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.75) 45%, transparent 100%)',
+                }}
+                aria-hidden
+              />
+              <figcaption className="absolute inset-x-0 bottom-0 px-3 pb-3 text-center">
+                <div className="font-mono text-[8px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+                  {sample.code}
+                </div>
+                <div className="font-serif-jp mt-0.5 text-[13px] font-medium leading-tight text-[var(--koi-ink)]">
+                  {sample.name}
+                </div>
+                <div className="mt-0.5 text-[10px] text-[var(--koi-ink-soft)]">
+                  {sample.caption}
+                </div>
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+
+        <p className="mt-5 text-center text-[11px] text-[var(--koi-ink-muted)]">
+          ※ 画像は生成例です。あなたの結果に合わせて毎回描き起こされます。
+        </p>
       </section>
 
       {/* 4 axes */}

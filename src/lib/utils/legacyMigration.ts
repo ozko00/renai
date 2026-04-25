@@ -1,11 +1,11 @@
 import {
   DiagnosisResult,
-  KoigokoroCode,
+  RenAICode,
   LegacyAttachmentType,
   LegacyDiagnosisResult,
   LegacyLoveStyleType,
 } from '@/types/diagnosis';
-import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+import { renAITypes } from '@/data/types/renAITypes';
 
 // 旧 attachment × lovestyle → 16 タイプの決定論的マッピング
 // 戦略:
@@ -20,7 +20,7 @@ import { koigokoroTypes } from '@/data/types/koigokoroTypes';
 //  - mania → 一途(E) で熱狂、agape → 一途(E) で献身
 const LEGACY_MAP: Record<
   LegacyAttachmentType,
-  Record<LegacyLoveStyleType, KoigokoroCode>
+  Record<LegacyLoveStyleType, RenAICode>
 > = {
   secure: {
     eros: 'LPWI',
@@ -100,7 +100,7 @@ export function migrateLegacyResult(
   if (!attachment || !loveStyle) return null;
 
   const code = LEGACY_MAP[attachment][loveStyle];
-  const type = koigokoroTypes[code];
+  const type = renAITypes[code];
 
   // 軸スコアは決定論的に推定 (各軸 ±0.6 程度の弱信号)
   const sign = (letter: string, positive: string): number =>

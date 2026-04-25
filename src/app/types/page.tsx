@@ -1,10 +1,10 @@
 import Link from 'next/link';
-import { koigokoroTypeList } from '@/data/types/koigokoroTypes';
+import { renAITypeList } from '@/data/types/renAITypes';
 
 export const metadata = {
-  title: '16タイプ一覧 — koigokoro',
+  title: '16タイプ一覧 — renAI',
   description:
-    'koigokoro の 16 の恋ごころタイプ。あなたに似た人、ちがう人を見つけてみてください。',
+    'renAI の 16 の恋ごころタイプ。あなたに似た人、ちがう人を見つけてみてください。',
 };
 
 function ChevronLeftIcon({ className = '' }: { className?: string }) {
@@ -82,7 +82,7 @@ export default function AllTypesPage() {
 
         {/* Type grid */}
         <div className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {koigokoroTypeList.map((type) => (
+          {renAITypeList.map((type) => (
             <article
               key={type.code}
               className="relative overflow-hidden rounded-2xl bg-[var(--koi-bg-card)] p-4 shadow-[0_1px_0_var(--koi-line)] transition-transform hover:-translate-y-0.5"

@@ -1,5 +1,5 @@
-import { AxisScores, KoigokoroCode } from '@/types/diagnosis';
-import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+import { AxisScores, RenAICode } from '@/types/diagnosis';
+import { renAITypes } from '@/data/types/renAITypes';
 
 const AXIS_DESCRIPTION: Record<string, string> = {
   LF: '主導(L) ↔ 受容(F)',
@@ -14,10 +14,10 @@ function formatAxis(score: number): string {
 }
 
 export function buildDiagnosisPrompt(
-  code: KoigokoroCode,
+  code: RenAICode,
   axes: AxisScores
 ): string {
-  const type = koigokoroTypes[code];
+  const type = renAITypes[code];
   return `あなたは恋愛心理学に詳しい優しいカウンセラーです。
 ユーザーの恋愛タイプ診断結果から、温かく前向きなパーソナルメッセージを作成してください。
 
@@ -47,6 +47,7 @@ export function buildDiagnosisPrompt(
 - 必ず上記 JSON のみを返す。前置きや説明は不要。
 - 「ユーザー」「あなた様」は使わず「あなた」で統一。
 - ポジティブで詩的な、けれど押しつけがましくないトーン。
-- スコアの極端に高い/低い軸があれば自然に言及する。
-- summary は型ステレオタイプの繰り返しではなく、軸スコアの個別性に触れる。`;
+- **スコアの数値や軸記号 (LF / PS / WA / IE / -0.17 / +0.5 等) を summary や advice の文中に絶対に含めない。** 数値ではなく「情熱寄り」「受容的」「言葉を大切にする」のような自然な日本語表現に必ず変換する。
+- 軸の傾向が極端に出ている場合は、その軸の特徴を自然な言葉で表現に織り込む (記号や数値ではなく)。
+- summary は型ステレオタイプの繰り返しではなく、軸の傾向の個別性を自然言語で描写する。`;
 }

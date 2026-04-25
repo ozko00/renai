@@ -1,44 +1,44 @@
 import type {
   CompatibilityAxisAnalysis,
   CompatibilityResult,
-  KoigokoroAxis,
-  KoigokoroCode,
+  RenAIAxis,
+  RenAICode,
 } from '@/types/diagnosis';
-import { axisLabels, koigokoroTypes } from '@/data/types/koigokoroTypes';
+import { axisLabels, renAITypes } from '@/data/types/renAITypes';
 
-const AXIS_INDEX: Record<KoigokoroAxis, number> = {
+const AXIS_INDEX: Record<RenAIAxis, number> = {
   LF: 0,
   PS: 1,
   WA: 2,
   IE: 3,
 };
 
-const AXIS_ORDER: ReadonlyArray<KoigokoroAxis> = ['LF', 'PS', 'WA', 'IE'];
+const AXIS_ORDER: ReadonlyArray<RenAIAxis> = ['LF', 'PS', 'WA', 'IE'];
 
-const POSITIVE_LETTER: Record<KoigokoroAxis, string> = {
+const POSITIVE_LETTER: Record<RenAIAxis, string> = {
   LF: 'L',
   PS: 'P',
   WA: 'W',
   IE: 'I',
 };
 
-const VALID_CODES = new Set<string>(Object.keys(koigokoroTypes));
+const VALID_CODES = new Set<string>(Object.keys(renAITypes));
 
-export function isKoigokoroCode(value: unknown): value is KoigokoroCode {
+export function isRenAICode(value: unknown): value is RenAICode {
   return typeof value === 'string' && VALID_CODES.has(value);
 }
 
-function letterAt(code: KoigokoroCode, axis: KoigokoroAxis): string {
+function letterAt(code: RenAICode, axis: RenAIAxis): string {
   return code[AXIS_INDEX[axis]];
 }
 
-function axisLabelFor(code: KoigokoroCode, axis: KoigokoroAxis): string {
+function axisLabelFor(code: RenAICode, axis: RenAIAxis): string {
   const positive = letterAt(code, axis) === POSITIVE_LETTER[axis];
   const labels = axisLabels[axis];
   return positive ? labels.positive : labels.negative;
 }
 
-const MATCH_COMMENT: Record<KoigokoroAxis, { match: string; mismatch: string }> = {
+const MATCH_COMMENT: Record<RenAIAxis, { match: string; mismatch: string }> = {
   LF: {
     match:
       'リードする / 寄り添う のバランス感覚が似ていて、関係の主導権で衝突しにくい組み合わせ。',
@@ -62,8 +62,8 @@ const MATCH_COMMENT: Record<KoigokoroAxis, { match: string; mismatch: string }> 
 };
 
 function buildAxes(
-  self: KoigokoroCode,
-  other: KoigokoroCode
+  self: RenAICode,
+  other: RenAICode
 ): CompatibilityAxisAnalysis[] {
   return AXIS_ORDER.map((axis) => {
     const selfLetter = letterAt(self, axis);
@@ -95,13 +95,13 @@ function toneFromMatchCount(matchCount: number): string {
 }
 
 function summarize(
-  self: KoigokoroCode,
-  other: KoigokoroCode,
+  self: RenAICode,
+  other: RenAICode,
   axes: CompatibilityAxisAnalysis[],
   matchCount: number
 ): string {
-  const selfType = koigokoroTypes[self];
-  const otherType = koigokoroTypes[other];
+  const selfType = renAITypes[self];
+  const otherType = renAITypes[other];
   const matchedAxes = axes.filter((a) => a.match);
   const mismatchAxes = axes.filter((a) => !a.match);
 
@@ -123,8 +123,8 @@ function summarize(
 }
 
 export function calculateCompatibility(
-  self: KoigokoroCode,
-  other: KoigokoroCode
+  self: RenAICode,
+  other: RenAICode
 ): CompatibilityResult {
   const axes = buildAxes(self, other);
   const matchCount = axes.filter((a) => a.match).length;

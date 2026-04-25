@@ -1,11 +1,11 @@
-import { KoigokoroCode, KoigokoroType } from '@/types/diagnosis';
+import { RenAICode, RenAIType } from '@/types/diagnosis';
 
 // 4軸 (LF/PS/WA/IE) の組み合わせで決まる 16タイプ
 // 軸1: L=主導 / F=受容
 // 軸2: P=情熱 / S=安定
 // 軸3: W=言葉 / A=行動
 // 軸4: I=自由 / E=一途
-export const koigokoroTypes: Record<KoigokoroCode, KoigokoroType> = {
+export const renAITypes: Record<RenAICode, RenAIType> = {
   LPWI: { code: 'LPWI', name: '太陽の恋人', emoji: '🌞', tone: '#F5C896', desc: '言葉で情熱を伝え、自由を愛するリーダー型', short: '輝いて誘う人' },
   LPWE: { code: 'LPWE', name: '薔薇の騎士', emoji: '🌹', tone: '#E89B96', desc: '熱烈な言葉で一途に愛を捧げる', short: '熱く誓う人' },
   LPAI: { code: 'LPAI', name: '流星の旅人', emoji: '☄️', tone: '#C9A3D4', desc: '行動派で情熱的、自由に駆け抜ける', short: '駆け抜ける人' },
@@ -24,7 +24,7 @@ export const koigokoroTypes: Record<KoigokoroCode, KoigokoroType> = {
   FSAE: { code: 'FSAE', name: '湖の番人', emoji: '🪷', tone: '#A3C2D4', desc: '静かな行動で一途に支え続ける', short: '静かに守る人' },
 };
 
-export const koigokoroTypeList: ReadonlyArray<KoigokoroType> = Object.values(koigokoroTypes);
+export const renAITypeList: ReadonlyArray<RenAIType> = Object.values(renAITypes);
 
 // 軸ラベル（結果画面の左右ラベル用）
 export const axisLabels = {

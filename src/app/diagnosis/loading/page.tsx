@@ -8,7 +8,7 @@ import type {
   LikertValue,
 } from '@/types/diagnosis';
 
-const ANSWERS_STORAGE_KEY = 'koigokoroAnswers';
+const ANSWERS_STORAGE_KEY = 'renAIAnswers';
 const RESULT_STORAGE_KEY = 'diagnosisResult';
 
 type ApiSuccess = { success: true; result: DiagnosisResult };
@@ -47,19 +47,6 @@ function readAnswers(): AxisAnswers | null {
   }
 }
 
-function HeartIcon({ className = '' }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 14 14"
-      fill="currentColor"
-      className={className}
-      aria-hidden
-    >
-      <path d="M7 12.5C7 12.5 1 9 1 5C1 3 2.5 1.5 4.5 1.5C5.7 1.5 6.6 2.2 7 3C7.4 2.2 8.3 1.5 9.5 1.5C11.5 1.5 13 3 13 5C13 9 7 12.5 7 12.5Z" />
-    </svg>
-  );
-}
-
 export default function DiagnosisLoadingPage() {
   const router = useRouter();
   const [status, setStatus] = useState<LoadingStatus>({ kind: 'loading' });
@@ -75,21 +62,15 @@ export default function DiagnosisLoadingPage() {
       return;
     }
 
-    let cancelled = false;
-    const controller = new AbortController();
-
     const run = async () => {
       try {
         const res = await fetch('/api/diagnosis', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ answers }),
-          signal: controller.signal,
         });
 
         const json = (await res.json()) as ApiResponse;
-
-        if (cancelled) return;
 
         if (!res.ok || !json.success) {
           if (res.status === 429) {
@@ -117,10 +98,28 @@ export default function DiagnosisLoadingPage() {
           return;
         }
 
+        const result = json.result;
+
+        // 画像 API を warm-up: サーバ側 in-memory キャッシュに保存し、
+        // 結果ページの <CharacterImage> が同一 URL を fetch すると即座に返る。
+        // 失敗（API key 無効・レート超過・Gemini 不調）はサイレントに無視。
+        try {
+          const imgParams = new URLSearchParams({
+            code: result.code,
+            lf: String(result.axes.LF),
+            ps: String(result.axes.PS),
+            wa: String(result.axes.WA),
+            ie: String(result.axes.IE),
+          });
+          await fetch(`/api/character?${imgParams.toString()}`);
+        } catch {
+          // 画像生成失敗は致命的ではない（絵文字フォールバックが効く）
+        }
+
         try {
           window.localStorage.setItem(
             RESULT_STORAGE_KEY,
-            JSON.stringify(json.result)
+            JSON.stringify(result)
           );
           window.sessionStorage.removeItem(ANSWERS_STORAGE_KEY);
         } catch {
@@ -129,13 +128,6 @@ export default function DiagnosisLoadingPage() {
 
         router.replace('/diagnosis/result');
       } catch (error) {
-        if (cancelled) return;
-        if (
-          error instanceof DOMException &&
-          error.name === 'AbortError'
-        ) {
-          return;
-        }
         setStatus({
           kind: 'error',
           message:
@@ -147,11 +139,6 @@ export default function DiagnosisLoadingPage() {
     };
 
     void run();
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
   }, [router]);
 
   const handleRetry = () => {
@@ -184,16 +171,7 @@ export default function DiagnosisLoadingPage() {
       <section className="relative mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center px-7 py-10 text-center">
         {status.kind === 'loading' && (
           <>
-            <div className="relative h-32 w-32" aria-hidden>
-              <span className="absolute inset-0 animate-ping rounded-full bg-[var(--koi-primary-soft)] opacity-60" />
-              <span className="absolute inset-3 rounded-full bg-[var(--koi-primary-soft)] opacity-80" />
-              <span className="absolute inset-7 rounded-full bg-[var(--koi-primary)] opacity-90" />
-              <span className="absolute inset-0 flex items-center justify-center text-white">
-                <HeartIcon className="h-8 w-8 koi-pulse" />
-              </span>
-            </div>
-
-            <h1 className="font-serif-jp mt-10 text-[20px] font-medium leading-[1.6]">
+            <h1 className="font-serif-jp text-[20px] font-medium leading-[1.6]">
               あなたの恋ごころを
               <br />
               読み解いています
@@ -271,21 +249,6 @@ export default function DiagnosisLoadingPage() {
       </section>
 
       <style jsx>{`
-        :global(.koi-pulse) {
-          animation: koi-pulse 1.6s ease-in-out infinite;
-          transform-origin: center;
-        }
-        @keyframes koi-pulse {
-          0%,
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-          50% {
-            transform: scale(1.15);
-            opacity: 0.85;
-          }
-        }
         :global(.koi-dot) {
           display: inline-block;
           opacity: 0;

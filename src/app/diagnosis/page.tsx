@@ -48,7 +48,7 @@ export default function DiagnosisPage() {
             <HeartIcon className="h-3 w-3" />
           </span>
           <span className="font-serif-jp text-[13px] font-medium tracking-[0.08em]">
-            koigokoro
+            renAI
           </span>
         </div>
 

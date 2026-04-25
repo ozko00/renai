@@ -1,27 +1,27 @@
 import {
   AxisAnswers,
   AxisScores,
-  KoigokoroAxis,
-  KoigokoroCode,
+  RenAIAxis,
+  RenAICode,
   LikertValue,
 } from '@/types/diagnosis';
 import { axisQuestions } from '@/data/questions/axisQuestions';
 
 // 軸ごとに「+方向 = 軸前者」の符号で 4文字コードを組み立てる
-const POSITIVE_LETTER: Record<KoigokoroAxis, string> = {
+const POSITIVE_LETTER: Record<RenAIAxis, string> = {
   LF: 'L',
   PS: 'P',
   WA: 'W',
   IE: 'I',
 };
-const NEGATIVE_LETTER: Record<KoigokoroAxis, string> = {
+const NEGATIVE_LETTER: Record<RenAIAxis, string> = {
   LF: 'F',
   PS: 'S',
   WA: 'A',
   IE: 'E',
 };
 
-const AXIS_ORDER: ReadonlyArray<KoigokoroAxis> = ['LF', 'PS', 'WA', 'IE'];
+const AXIS_ORDER: ReadonlyArray<RenAIAxis> = ['LF', 'PS', 'WA', 'IE'];
 
 // Likert 1=とてもそう思う, 5=全く思わない を -2..+2 に変換
 function likertToSigned(value: LikertValue, reverse: boolean): number {
@@ -31,7 +31,7 @@ function likertToSigned(value: LikertValue, reverse: boolean): number {
 
 export function calculateAxisScores(answers: AxisAnswers): AxisScores {
   const sums: AxisScores = { LF: 0, PS: 0, WA: 0, IE: 0 };
-  const counts: Record<KoigokoroAxis, number> = { LF: 0, PS: 0, WA: 0, IE: 0 };
+  const counts: Record<RenAIAxis, number> = { LF: 0, PS: 0, WA: 0, IE: 0 };
 
   for (const q of axisQuestions) {
     const v = answers[q.id];
@@ -48,11 +48,11 @@ export function calculateAxisScores(answers: AxisAnswers): AxisScores {
   return result;
 }
 
-export function codeFromAxes(scores: AxisScores): KoigokoroCode {
+export function codeFromAxes(scores: AxisScores): RenAICode {
   const code = AXIS_ORDER.map((axis) =>
     scores[axis] >= 0 ? POSITIVE_LETTER[axis] : NEGATIVE_LETTER[axis]
   ).join('');
-  return code as KoigokoroCode;
+  return code as RenAICode;
 }
 
 // -1..+1 を 0..100 に変換 (中央 = 50)

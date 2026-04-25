@@ -43,7 +43,7 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 
-  /* koigokoro design tokens — sky theme */
+  /* renAI design tokens — sky theme */
   --color-koi-bg: var(--koi-bg);
   --color-koi-bg-soft: var(--koi-bg-soft);
   --color-koi-bg-card: var(--koi-bg-card);
@@ -91,7 +91,7 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* koigokoro — sky theme (default) */
+  /* renAI — sky theme (default) */
   --koi-bg: #F4F7FB;
   --koi-bg-soft: #E3EBF2;
   --koi-bg-card: #FFFFFF;
