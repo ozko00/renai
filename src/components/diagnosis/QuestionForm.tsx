@@ -4,6 +4,7 @@ import { useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { axisQuestions } from '@/data/questions/axisQuestions';
 import { LikertValue } from '@/types/diagnosis';
+import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const ANSWERS_STORAGE_KEY = 'koigokoroAnswers';
 
@@ -157,11 +158,14 @@ export default function QuestionForm() {
     getAnswersSnapshot,
     getServerAnswersSnapshot
   );
+  const mounted = useHydrated();
 
-  const [index, setIndex] = useState<number>(() =>
-    computeFirstUnansweredIndex(getAnswersSnapshot())
-  );
+  // SSR と初回ハイドレートでは index=0 で固定し、マウント後の最初の再レンダーで
+  // sessionStorage 由来の resume 位置に切り替える。
+  const resumeIndex = mounted ? computeFirstUnansweredIndex(answers) : 0;
+  const [userOffset, setUserOffset] = useState<number>(0);
 
+  const index = Math.min(Math.max(resumeIndex + userOffset, 0), TOTAL - 1);
   const question = axisQuestions[index];
   const selected = question ? answers[question.id] : undefined;
   const answeredCount = Object.keys(answers).length;
@@ -183,12 +187,16 @@ export default function QuestionForm() {
       }
     }
     setTimeout(() => {
-      setIndex((prev) => Math.min(prev + 1, TOTAL - 1));
+      const newResume = computeFirstUnansweredIndex(next);
+      const targetIndex = Math.min(index + 1, TOTAL - 1);
+      setUserOffset(targetIndex - newResume);
     }, 220);
   };
 
   const handlePrev = () => {
-    setIndex((prev) => Math.max(prev - 1, 0));
+    const newResume = computeFirstUnansweredIndex(answers);
+    const targetIndex = Math.max(index - 1, 0);
+    setUserOffset(targetIndex - newResume);
   };
 
   const handleClose = () => {

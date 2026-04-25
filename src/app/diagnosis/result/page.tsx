@@ -10,6 +10,7 @@ import {
   isLegacyResult,
   migrateLegacyResult,
 } from '@/lib/utils/legacyMigration';
+import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const RESULT_STORAGE_KEY = 'diagnosisResult';
 
@@ -80,7 +81,10 @@ export default function DiagnosisResultPage() {
     () => null
   );
 
+  const mounted = useHydrated();
+
   const result = useMemo<DiagnosisResult | null>(() => {
+    if (!mounted) return null;
     if (stored === null) return null;
     try {
       const parsed: unknown = JSON.parse(stored);
@@ -89,7 +93,7 @@ export default function DiagnosisResultPage() {
     } catch {
       return null;
     }
-  }, [stored]);
+  }, [mounted, stored]);
 
   // 旧スキーマの自動マイグレーション
   useEffect(() => {
@@ -115,8 +119,6 @@ export default function DiagnosisResultPage() {
       // 何もしない
     }
   }, [result]);
-
-  const mounted = typeof window !== 'undefined';
 
   useEffect(() => {
     if (!mounted) return;

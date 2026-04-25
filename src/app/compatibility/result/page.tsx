@@ -12,6 +12,7 @@ import {
   calculateCompatibility,
   isKoigokoroCode,
 } from '@/lib/utils/compatibility';
+import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const COMPATIBILITY_STORAGE_KEY = 'compatibilityRequest';
 
@@ -91,13 +92,15 @@ function subscribeRequest(callback: () => void): () => void {
 
 export default function CompatibilityResultPage() {
   const router = useRouter();
-  const request = useSyncExternalStore(
+  const storedRequest = useSyncExternalStore(
     subscribeRequest,
     getRequestSnapshot,
     getServerRequestSnapshot
   );
 
-  const hydrated = typeof window !== 'undefined';
+  const hydrated = useHydrated();
+  // SSR/初回ハイドレートはローディング表示で揃え、マウント後に実値を見せる
+  const request = hydrated ? storedRequest : null;
 
   useEffect(() => {
     if (hydrated && !request) {

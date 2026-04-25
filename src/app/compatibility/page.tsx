@@ -6,6 +6,7 @@ import Link from 'next/link';
 import type { DiagnosisResult, KoigokoroCode } from '@/types/diagnosis';
 import { koigokoroTypeList } from '@/data/types/koigokoroTypes';
 import { isKoigokoroCode } from '@/lib/utils/compatibility';
+import { useHydrated } from '@/lib/hooks/useHydrated';
 
 const RESULT_STORAGE_KEY = 'diagnosisResult';
 const COMPATIBILITY_STORAGE_KEY = 'compatibilityRequest';
@@ -84,12 +85,14 @@ function subscribeResult(callback: () => void): () => void {
 
 export default function CompatibilityPage() {
   const router = useRouter();
-  const self = useSyncExternalStore(
+  const storedSelf = useSyncExternalStore(
     subscribeResult,
     getResultSnapshot,
     getServerResultSnapshot
   );
-  const hydrated = typeof window !== 'undefined';
+  const hydrated = useHydrated();
+  // SSR/初回ハイドレートでは常に null を表示し、ハイドレート完了後にだけ実体を出す
+  const self = hydrated ? storedSelf : null;
   const [otherCode, setOtherCode] = useState<KoigokoroCode | null>(null);
 
   const sortedTypes = useMemo(() => koigokoroTypeList, []);
