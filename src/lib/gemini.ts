@@ -1,6 +1,9 @@
-import { GoogleGenAI, ApiError } from '@google/genai';
+import { GoogleGenAI, ApiError, Modality } from '@google/genai';
+
+export { Modality };
 
 export const GEMINI_MODEL = 'gemini-2.5-flash-lite';
+export const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image-preview';
 
 export function getGeminiClient(): GoogleGenAI {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
