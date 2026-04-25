@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
-import { getOpenAIClient, withOpenAIRetry } from '@/lib/openai';
+import { Type } from '@google/genai';
+import {
+  GEMINI_MODEL,
+  classifyGeminiError,
+  getGeminiClient,
+  withGeminiRetry,
+} from '@/lib/gemini';
 import { calculateAxisScores, codeFromAxes } from '@/lib/utils/scoring';
 import { buildDiagnosisPrompt } from '@/lib/prompts/diagnosisPrompt';
 import { koigokoroTypes } from '@/data/types/koigokoroTypes';
@@ -57,6 +62,21 @@ function parseAnswers(input: unknown): AxisAnswers | null {
   return out;
 }
 
+const SYSTEM_INSTRUCTION =
+  'あなたは恋愛心理学に詳しい優しいカウンセラーです。出力は必ず指定された JSON 形式のみで返します。';
+
+const RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    summary: { type: Type.STRING },
+    advice: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+    },
+  },
+  required: ['summary', 'advice'],
+} as const;
+
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
   const limit = checkRateLimit(ip);
@@ -90,24 +110,21 @@ export async function POST(request: NextRequest) {
 
     const prompt = buildDiagnosisPrompt(code, axes);
 
-    const openai = getOpenAIClient();
-    const completion = await withOpenAIRetry(() =>
-      openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'あなたは恋愛心理学に詳しい優しいカウンセラーです。出力は必ず指定された JSON 形式のみで返します。',
-          },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.7,
+    const ai = getGeminiClient();
+    const response = await withGeminiRetry(() =>
+      ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: prompt,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          responseMimeType: 'application/json',
+          responseSchema: RESPONSE_SCHEMA,
+          temperature: 0.7,
+        },
       })
     );
 
-    const content = completion.choices[0].message.content;
+    const content = response.text;
     if (!content) {
       throw new Error('AI 分析結果が空です');
     }
@@ -134,12 +151,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, result });
   } catch (error) {
     console.error('Diagnosis API error:', error);
+    const classified = classifyGeminiError(error);
 
-    if (error instanceof OpenAI.AuthenticationError) {
+    if (classified.isAuth) {
       return NextResponse.json(
         {
           success: false,
-          error: 'OpenAI APIキーが無効です。管理者にお問い合わせください。',
+          error: 'Gemini APIキーが無効です。管理者にお問い合わせください。',
           ...(process.env.NODE_ENV !== 'production'
             ? { detail: 'Invalid API key. Check .env.local and restart dev server.' }
             : {}),
@@ -148,21 +166,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (error instanceof OpenAI.RateLimitError) {
+    if (classified.isRateLimit) {
       console.error(
-        '[diagnosis] OpenAI RateLimitError after retries:',
-        error.code,
-        error.status
+        '[diagnosis] Gemini RateLimit after retries:',
+        classified.status
       );
-      const headers: unknown = error.headers;
-      let retryAfterRaw: string | undefined;
-      if (headers instanceof Headers) {
-        retryAfterRaw = headers.get('retry-after') ?? undefined;
-      } else if (headers && typeof headers === 'object') {
-        retryAfterRaw = (headers as Record<string, string | undefined>)['retry-after'];
-      }
-      const parsed = Number(retryAfterRaw);
-      const retryAfter = Number.isFinite(parsed) && parsed > 0 ? parsed : 60;
+      const retryAfter =
+        classified.retryAfterMs > 0
+          ? Math.ceil(classified.retryAfterMs / 1000)
+          : 60;
       return NextResponse.json(
         {
           success: false,
@@ -176,12 +188,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const detail = error instanceof Error ? error.message : 'unknown error';
     return NextResponse.json(
       {
         success: false,
         error: '診断処理中にエラーが発生しました',
-        ...(process.env.NODE_ENV !== 'production' ? { detail } : {}),
+        ...(process.env.NODE_ENV !== 'production'
+          ? { detail: classified.message }
+          : {}),
       },
       { status: 500 }
     );
