@@ -194,14 +194,9 @@
 .koi-anim-rise    { animation: koi-rise 0.7s cubic-bezier(0.16, 1, 0.3, 1) var(--koi-rise-delay, 0s) both; }
 
 /* ─────────────────────────────────────────────
-   Spinning globe loading indicator
+   Spinning globe whirl rings (the globe itself
+   rotates via JS / requestAnimationFrame)
    ───────────────────────────────────────────── */
-@keyframes koi-globe-spin {
-  /* Country mass tile shifts left by 120 (= globe diameter) for seamless loop */
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-120px); }
-}
-
 @keyframes koi-globe-rotate-cw {
   0%   { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
@@ -212,21 +207,14 @@
   100% { transform: rotate(-360deg); }
 }
 
-.koi-globe-rotate {
-  animation: koi-globe-spin 12s linear infinite;
-  will-change: transform;
-}
-
 .koi-globe-whirl-cw {
-  animation: koi-globe-rotate-cw 8s linear infinite;
-  transform-origin: 100px 100px;
+  animation: koi-globe-rotate-cw 9s linear infinite;
   transform-box: fill-box;
   will-change: transform;
 }
 
 .koi-globe-whirl-ccw {
   animation: koi-globe-rotate-ccw 14s linear infinite;
-  transform-origin: 100px 100px;
   transform-box: fill-box;
   will-change: transform;
 }
@@ -237,7 +225,6 @@
   .koi-anim-letter,
   .koi-anim-twinkle,
   .koi-anim-rise,
-  .koi-globe-rotate,
   .koi-globe-whirl-cw,
   .koi-globe-whirl-ccw {
     animation: none !important;
