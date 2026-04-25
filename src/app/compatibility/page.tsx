@@ -1,275 +1,260 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { AttachmentType, LoveStyleType, DiagnosisResult } from '@/types/diagnosis';
-import { attachmentTypeInfo } from '@/data/types/attachmentTypes';
-import { loveStyleTypeInfo } from '@/data/types/loveStyleTypes';
-import { ChevronLeft, Users, Heart, Loader2, Sparkles } from 'lucide-react';
+import type { DiagnosisResult, KoigokoroCode } from '@/types/diagnosis';
+import { koigokoroTypeList } from '@/data/types/koigokoroTypes';
+import { isKoigokoroCode } from '@/lib/utils/compatibility';
+
+const RESULT_STORAGE_KEY = 'diagnosisResult';
+const COMPATIBILITY_STORAGE_KEY = 'compatibilityRequest';
+
+function ChevronLeftIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 5l-5 5 5 5" />
+    </svg>
+  );
+}
+
+function HeartIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 14 14" fill="currentColor" className={className} aria-hidden>
+      <path d="M7 12.5C7 12.5 1 9 1 5C1 3 2.5 1.5 4.5 1.5C5.7 1.5 6.6 2.2 7 3C7.4 2.2 8.3 1.5 9.5 1.5C11.5 1.5 13 3 13 5C13 9 7 12.5 7 12.5Z" />
+    </svg>
+  );
+}
+
+function parseStoredResult(raw: string | null): DiagnosisResult | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      'version' in parsed &&
+      (parsed as { version: unknown }).version === 2
+    ) {
+      return parsed as DiagnosisResult;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+let cachedResultRaw: string | null = null;
+let cachedResult: DiagnosisResult | null = null;
+
+function getResultSnapshot(): DiagnosisResult | null {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(RESULT_STORAGE_KEY);
+  if (raw === cachedResultRaw) return cachedResult;
+  cachedResultRaw = raw;
+  cachedResult = parseStoredResult(raw);
+  return cachedResult;
+}
+
+function getServerResultSnapshot(): DiagnosisResult | null {
+  return null;
+}
+
+function subscribeResult(callback: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (e: StorageEvent) => {
+    if (e.key === null || e.key === RESULT_STORAGE_KEY) {
+      callback();
+    }
+  };
+  window.addEventListener('storage', handler);
+  return () => {
+    window.removeEventListener('storage', handler);
+  };
+}
 
 export default function CompatibilityPage() {
   const router = useRouter();
-  const [userResult, setUserResult] = useState<DiagnosisResult | null>(null);
-  const [mode, setMode] = useState<'general' | 'specific'>('general');
-  const [partnerAttachment, setPartnerAttachment] = useState<AttachmentType | null>(null);
-  const [partnerLoveStyle, setPartnerLoveStyle] = useState<LoveStyleType | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const self = useSyncExternalStore(
+    subscribeResult,
+    getResultSnapshot,
+    getServerResultSnapshot
+  );
+  const hydrated = typeof window !== 'undefined';
+  const [otherCode, setOtherCode] = useState<KoigokoroCode | null>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('diagnosisResult');
-    if (stored) {
-      try {
-        setUserResult(JSON.parse(stored));
-      } catch {
-        // 診断結果がない場合は診断ページへ
-      }
-    }
-  }, []);
+  const sortedTypes = useMemo(() => koigokoroTypeList, []);
 
-  const handleSubmit = async () => {
-    if (!userResult) {
-      setError('まず診断を受けてください');
-      return;
-    }
+  const canSubmit = !!self && !!otherCode;
 
-    if (mode === 'specific' && (!partnerAttachment || !partnerLoveStyle)) {
-      setError('パートナーのタイプを選択してください');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
+  const handleSubmit = () => {
+    if (!canSubmit) return;
     try {
-      const userAttachment = userResult.analysis.attachmentAnalysis.primaryType as AttachmentType;
-      const userLoveStyle = userResult.analysis.loveStyleAnalysis.primaryType as LoveStyleType;
-
-      const response = await fetch('/api/compatibility', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mode,
-          userAttachment,
-          userLoveStyle,
-          partnerAttachment: mode === 'specific' ? partnerAttachment : undefined,
-          partnerLoveStyle: mode === 'specific' ? partnerLoveStyle : undefined,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || '相性診断に失敗しました');
-      }
-
-      localStorage.setItem('compatibilityResult', JSON.stringify({
-        mode,
-        userAttachment,
-        userLoveStyle,
-        partnerAttachment,
-        partnerLoveStyle,
-        result: data.result,
-      }));
-      router.push('/compatibility/result');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '相性診断に失敗しました');
-      setIsSubmitting(false);
+      window.localStorage.setItem(
+        COMPATIBILITY_STORAGE_KEY,
+        JSON.stringify({ selfCode: self.code, otherCode })
+      );
+    } catch {
+      // ignore
     }
+    router.push('/compatibility/result');
   };
 
-  const attachmentTypes: AttachmentType[] = ['secure', 'preoccupied', 'dismissive', 'fearful'];
-  const loveStyleTypes: LoveStyleType[] = ['eros', 'ludus', 'storge', 'pragma', 'mania', 'agape'];
-
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 to-white">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-20">
-        <div className="container mx-auto px-4 py-4">
+    <main className="min-h-screen bg-[var(--koi-bg)] text-[var(--koi-ink)]">
+      <header className="sticky top-0 z-20 bg-[var(--koi-bg)]/95 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-5 py-4 sm:px-7">
           <Link
-            href={userResult ? '/diagnosis/result' : '/'}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            href={self ? '/diagnosis/result' : '/'}
+            className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full text-[var(--koi-ink-soft)] transition-colors hover:bg-[var(--koi-bg-card)]"
+            aria-label="戻る"
           >
-            <ChevronLeft className="h-5 w-5 mr-1" />
-            戻る
+            <ChevronLeftIcon className="h-5 w-5" />
           </Link>
+          <span className="font-mono text-[11px] tracking-[0.22em] text-[var(--koi-ink-soft)]">
+            COMPATIBILITY
+          </span>
+          <span className="w-9" aria-hidden />
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
-        {/* Title */}
-        <div className="text-center mb-8">
-          <Users className="h-12 w-12 text-rose-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">相性診断</h1>
-          <p className="text-gray-600">
-            {userResult
-              ? 'あなたのタイプに合うパートナーを分析します'
-              : '先に診断を受けてください'}
+      <section className="mx-auto w-full max-w-2xl px-5 pb-16 sm:px-7">
+        <div className="pt-2">
+          <div className="font-mono text-[10px] tracking-[0.28em] text-[var(--koi-ink-muted)]">
+            16 × 16
+          </div>
+          <h1 className="font-serif-jp mt-2 text-[26px] font-medium leading-[1.3] tracking-[-0.005em] sm:text-[32px]">
+            ふたりの恋ごころ、
+            <br />
+            重ねてみませんか
+          </h1>
+          <p className="mt-3 max-w-md text-[13px] leading-[1.85] text-[var(--koi-ink-soft)]">
+            自分のタイプと、気になる人のタイプを選ぶと、4 つの軸からふたりの相性をやさしく読み解きます。
           </p>
         </div>
 
-        {!userResult ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-gray-600 mb-4">
-                相性診断を行うには、まず恋愛タイプ診断を受ける必要があります。
-              </p>
-              <Link href="/diagnosis">
-                <Button className="bg-rose-500 hover:bg-rose-600">
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  診断を受ける
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-6">
-            {/* User Type Display */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">あなたのタイプ</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex gap-4">
-                  <div className="flex-1 text-center p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">愛着スタイル</p>
-                    <p className="font-semibold">
-                      {attachmentTypeInfo[userResult.analysis.attachmentAnalysis.primaryType as AttachmentType]?.name}
-                    </p>
-                  </div>
-                  <div className="flex-1 text-center p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">愛のスタイル</p>
-                    <p className="font-semibold">
-                      {loveStyleTypeInfo[userResult.analysis.loveStyleAnalysis.primaryType as LoveStyleType]?.name}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Mode Selection */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">診断モード</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RadioGroup value={mode} onValueChange={(v) => setMode(v as 'general' | 'specific')}>
-                  <div className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50">
-                    <RadioGroupItem value="general" id="general" className="mt-1" />
-                    <Label htmlFor="general" className="cursor-pointer flex-1">
-                      <p className="font-medium">一般的な相性</p>
-                      <p className="text-sm text-gray-500">
-                        あなたのタイプに合う一般的なパートナー像を分析
-                      </p>
-                    </Label>
-                  </div>
-                  <div className="flex items-start space-x-3 p-3 rounded-lg hover:bg-gray-50">
-                    <RadioGroupItem value="specific" id="specific" className="mt-1" />
-                    <Label htmlFor="specific" className="cursor-pointer flex-1">
-                      <p className="font-medium">特定の人との相性</p>
-                      <p className="text-sm text-gray-500">
-                        気になる人のタイプを選んで相性を診断
-                      </p>
-                    </Label>
-                  </div>
-                </RadioGroup>
-              </CardContent>
-            </Card>
-
-            {/* Partner Type Selection (specific mode) */}
-            {mode === 'specific' && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">相手のタイプを選択</CardTitle>
-                  <CardDescription>
-                    相手に診断を受けてもらうか、予想で選んでください
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Attachment Type */}
-                  <div>
-                    <p className="font-medium mb-3">愛着スタイル</p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {attachmentTypes.map((type) => {
-                        const info = attachmentTypeInfo[type];
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => setPartnerAttachment(type)}
-                            className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                              partnerAttachment === type
-                                ? 'border-rose-500 bg-rose-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <p className="font-medium text-sm">{info.name}</p>
-                            <p className="text-xs text-gray-500">{info.nameEn}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Love Style Type */}
-                  <div>
-                    <p className="font-medium mb-3">愛のスタイル</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {loveStyleTypes.map((type) => {
-                        const info = loveStyleTypeInfo[type];
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => setPartnerLoveStyle(type)}
-                            className={`p-3 rounded-lg border-2 text-left transition-colors ${
-                              partnerLoveStyle === type
-                                ? 'border-rose-500 bg-rose-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <p className="font-medium text-sm">{info.name}</p>
-                            <p className="text-xs text-gray-500">{info.nameEn}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Error */}
-            {error && (
-              <div className="bg-red-50 text-red-700 p-4 rounded-lg text-center">
-                {error}
-              </div>
-            )}
-
-            {/* Submit */}
-            <Button
-              onClick={handleSubmit}
-              disabled={isSubmitting || (mode === 'specific' && (!partnerAttachment || !partnerLoveStyle))}
-              className="w-full bg-rose-500 hover:bg-rose-600 py-6 text-lg"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  AI分析中...
-                </>
-              ) : (
-                <>
-                  <Heart className="mr-2 h-5 w-5" />
-                  相性を診断する
-                </>
-              )}
-            </Button>
+        {/* Self */}
+        <article className="mt-8 rounded-3xl bg-[var(--koi-bg-card)] p-6 shadow-[0_2px_8px_var(--koi-line)] sm:p-7">
+          <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-primary-deep)]">
+            01 · あなた
           </div>
+          {!hydrated ? (
+            <div className="mt-4 h-12 animate-pulse rounded-2xl bg-[var(--koi-bg-soft)]" />
+          ) : self ? (
+            <div className="mt-4 flex items-center gap-4">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--koi-bg)] text-[26px]"
+                aria-hidden
+              >
+                {self.emoji}
+              </div>
+              <div className="flex-1">
+                <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+                  {self.code}
+                </div>
+                <div className="font-serif-jp mt-0.5 text-[18px] font-medium">
+                  {self.name}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4">
+              <p className="text-[13px] leading-[1.8] text-[var(--koi-ink-soft)]">
+                まず、あなた自身の診断を受けてください。
+              </p>
+              <Link
+                href="/diagnosis/start"
+                className="mt-4 inline-flex h-11 items-center justify-center rounded-[22px] bg-[var(--koi-ink)] px-6 text-[13px] font-semibold text-white"
+              >
+                診断をはじめる
+              </Link>
+            </div>
+          )}
+        </article>
+
+        {/* Other type picker */}
+        {self && (
+          <article className="mt-5 rounded-3xl bg-[var(--koi-bg-card)] p-6 shadow-[0_2px_8px_var(--koi-line)] sm:p-7">
+            <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-primary-deep)]">
+              02 · 気になる人
+            </div>
+            <h2 className="font-serif-jp mt-1.5 text-[16px] font-medium">
+              相手のタイプを選んでください
+            </h2>
+            <p className="mt-1 text-[11px] text-[var(--koi-ink-soft)]">
+              相手にも診断を受けてもらうのが一番ですが、予想で選んでも OK
+            </p>
+
+            <div
+              role="radiogroup"
+              aria-label="相手のタイプ"
+              className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3"
+            >
+              {sortedTypes.map((type) => {
+                const isSelected = otherCode === type.code;
+                return (
+                  <button
+                    key={type.code}
+                    type="button"
+                    role="radio"
+                    aria-checked={isSelected}
+                    onClick={() => {
+                      if (isKoigokoroCode(type.code)) {
+                        setOtherCode(type.code);
+                      }
+                    }}
+                    className="relative overflow-hidden rounded-2xl px-3 py-3 text-left transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--koi-primary-deep)]"
+                    style={{
+                      background: isSelected
+                        ? 'var(--koi-primary-soft)'
+                        : 'var(--koi-bg)',
+                      border: isSelected
+                        ? '1.5px solid var(--koi-primary-deep)'
+                        : '1.5px solid transparent',
+                    }}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="text-[20px]" aria-hidden>
+                        {type.emoji}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-mono text-[9px] tracking-[0.18em] text-[var(--koi-ink-muted)]">
+                          {type.code}
+                        </div>
+                        <div className="font-serif-jp truncate text-[12px] font-medium">
+                          {type.name}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </article>
         )}
-      </div>
+
+        {/* Submit */}
+        {self && (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="mt-8 flex h-14 w-full items-center justify-center gap-2 rounded-[28px] bg-[var(--koi-ink)] text-[14px] font-semibold tracking-[0.04em] text-white shadow-[0_8px_20px_var(--koi-primary-soft)] transition-all disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <HeartIcon className="h-3.5 w-3.5" />
+            相性を診断する
+          </button>
+        )}
+      </section>
     </main>
   );
 }

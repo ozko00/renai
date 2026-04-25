@@ -1,148 +1,243 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Heart, Users, Sparkles, Brain } from 'lucide-react';
+
+function PastelBlobs() {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      preserveAspectRatio="none"
+      aria-hidden
+    >
+      <defs>
+        <radialGradient id="koi-blob-1" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="var(--koi-primary)" stopOpacity="0.45" />
+          <stop offset="100%" stopColor="var(--koi-primary)" stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id="koi-blob-2" cx="50%" cy="50%">
+          <stop offset="0%" stopColor="var(--koi-accent)" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="var(--koi-accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx="20%" cy="12%" r="180" fill="url(#koi-blob-1)" />
+      <circle cx="88%" cy="28%" r="140" fill="url(#koi-blob-2)" />
+      <circle cx="10%" cy="70%" r="160" fill="url(#koi-blob-2)" />
+      <circle cx="92%" cy="92%" r="120" fill="url(#koi-blob-1)" />
+    </svg>
+  );
+}
+
+function HeartIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      fill="currentColor"
+      className={className}
+      aria-hidden
+    >
+      <path d="M7 12.5C7 12.5 1 9 1 5C1 3 2.5 1.5 4.5 1.5C5.7 1.5 6.6 2.2 7 3C7.4 2.2 8.3 1.5 9.5 1.5C11.5 1.5 13 3 13 5C13 9 7 12.5 7 12.5Z" />
+    </svg>
+  );
+}
+
+function SparkleIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" fill="currentColor" className={className} aria-hidden>
+      <path d="M6 0L7 5L12 6L7 7L6 12L5 7L0 6L5 5Z" />
+    </svg>
+  );
+}
+
+function CheckIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 14 14"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M3 7l3 3 5-6" />
+    </svg>
+  );
+}
+
+const TIPS: Array<[string, string]> = [
+  ['全24問', '約3分で終わります'],
+  ['いつでも中断OK', '直感で答えてOK'],
+  ['正解はない', 'シェアは任意'],
+];
+
+const AXES: Array<{ tag: string; count: string; text: string }> = [
+  {
+    tag: '主導 / 受容',
+    count: 'L · F',
+    text: '関係を引っ張っていきたいのか、相手のペースに寄り添いたいのか。',
+  },
+  {
+    tag: '情熱 / 安定',
+    count: 'P · S',
+    text: 'ドキドキする恋を求めるのか、穏やかな日常を大切にするのか。',
+  },
+  {
+    tag: '言葉 / 行動',
+    count: 'W · A',
+    text: '気持ちを言葉で伝えたいのか、行動でそっと示したいのか。',
+  },
+  {
+    tag: '自由 / 一途',
+    count: 'I · E',
+    text: '自分の世界を保ちたいのか、ひとりの相手に深く向き合いたいのか。',
+  },
+];
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 to-white">
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 py-16 text-center">
-        <div className="mb-8">
-          <Heart className="mx-auto h-16 w-16 text-rose-500 mb-4" />
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            恋愛タイプ診断
-          </h1>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            心理学の研究論文に基づき、
-            <br />
-            AIがあなたの愛着スタイルと恋愛パターンを分析。
-            <br />
-            相性の良いパートナータイプも診断できます。
-          </p>
+    <main className="relative min-h-screen overflow-hidden bg-[var(--koi-bg)] text-[var(--koi-ink)]">
+      <PastelBlobs />
+
+      {/* Header — logo */}
+      <header className="relative mx-auto flex w-full max-w-2xl items-center gap-2 px-7 pt-8 pb-2">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--koi-primary)] text-white">
+          <HeartIcon className="h-3.5 w-3.5" />
+        </span>
+        <span className="font-serif-jp text-[15px] font-medium tracking-[0.08em]">
+          koigokoro
+        </span>
+      </header>
+
+      {/* Hero */}
+      <section className="relative mx-auto w-full max-w-2xl px-7 pt-10 pb-12">
+        <div className="mb-5 inline-flex items-center gap-1.5 rounded-full bg-[var(--koi-bg-card)] px-3 py-1.5 text-[11px] text-[var(--koi-ink-soft)] shadow-[0_1px_2px_var(--koi-line)]">
+          <SparkleIcon className="h-3 w-3 text-[var(--koi-primary-deep)]" />
+          24問・約3分で診断
         </div>
 
-        <Link href="/diagnosis">
-          <Button size="lg" className="text-lg px-8 py-6 bg-rose-500 hover:bg-rose-600">
-            <Sparkles className="mr-2 h-5 w-5" />
-            診断を始める
-          </Button>
-        </Link>
+        <h1 className="font-serif-jp text-[40px] font-medium leading-[1.25] tracking-[-0.01em] sm:text-[56px]">
+          あなたの
+          <br />
+          恋のかたちは、
+          <br />
+          <span className="italic text-[var(--koi-primary-deep)]">
+            16のうちのどれ?
+          </span>
+        </h1>
+
+        <p className="mt-5 max-w-md text-[14px] leading-[1.8] text-[var(--koi-ink-soft)] sm:text-[15px]">
+          24の問いに答えると、
+          <br />
+          あなただけの恋愛タイプが見つかります。
+        </p>
+
+        <div className="mt-9 flex flex-col gap-3 sm:max-w-xs">
+          <Link
+            href="/diagnosis/start"
+            className="flex h-14 w-full items-center justify-center rounded-[28px] bg-[var(--koi-ink)] text-[15px] font-semibold tracking-[0.04em] text-white shadow-[0_8px_20px_var(--koi-primary-soft)] transition-transform hover:-translate-y-0.5"
+          >
+            診断をはじめる
+          </Link>
+          <Link
+            href="/types"
+            className="flex h-11 w-full items-center justify-center rounded-[22px] text-[13px] text-[var(--koi-ink-soft)] transition-colors hover:text-[var(--koi-ink)]"
+          >
+            16タイプを見る →
+          </Link>
+        </div>
       </section>
 
-      {/* Features Section */}
-      <section className="container mx-auto px-4 py-12">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
-          この診断でわかること
+      {/* 4 axes */}
+      <section
+        id="axes"
+        className="relative mx-auto w-full max-w-2xl px-7 py-10"
+      >
+        <h2 className="font-serif-jp text-[22px] font-medium leading-[1.4]">
+          4つの軸から、
+          <br />
+          あなたの恋ごころを読み解く
         </h2>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          <Card>
-            <CardHeader>
-              <Brain className="h-10 w-10 text-rose-500 mb-2" />
-              <CardTitle>愛着スタイル</CardTitle>
-              <CardDescription>4つのタイプから分析</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>・安定型（Secure）</li>
-                <li>・不安型（Preoccupied）</li>
-                <li>・回避型（Dismissive）</li>
-                <li>・恐れ・回避型（Fearful）</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <Heart className="h-10 w-10 text-rose-500 mb-2" />
-              <CardTitle>愛のスタイル</CardTitle>
-              <CardDescription>6つのタイプから分析</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>・情熱型（Eros）</li>
-                <li>・遊戯型（Ludus）</li>
-                <li>・友愛型（Storge）</li>
-                <li>・実用型（Pragma）</li>
-                <li>・熱狂型（Mania）</li>
-                <li>・博愛型（Agape）</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <Users className="h-10 w-10 text-rose-500 mb-2" />
-              <CardTitle>相性診断</CardTitle>
-              <CardDescription>理想のパートナー像</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-600">
-                あなたのタイプに合う理想的なパートナー像を分析。特定の人との相性も診断できます。
-              </p>
-            </CardContent>
-          </Card>
+        <div className="mt-7 flex flex-col gap-3">
+          {AXES.map(({ tag, count, text }) => (
+            <article
+              key={tag}
+              className="relative overflow-hidden rounded-2xl bg-[var(--koi-bg-card)] p-5 shadow-[0_1px_0_var(--koi-line)]"
+            >
+              <div className="absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[var(--koi-primary-soft)] opacity-50" />
+              <div className="relative">
+                <div className="flex items-baseline gap-2">
+                  <h3 className="font-serif-jp text-[17px] font-medium">
+                    {tag}
+                  </h3>
+                  <span className="font-mono text-[10px] tracking-[0.18em] text-[var(--koi-ink-muted)]">
+                    {count}
+                  </span>
+                </div>
+                <p className="mt-2 text-[13px] leading-[1.8] text-[var(--koi-ink-soft)]">
+                  {text}
+                </p>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
 
       {/* How it works */}
-      <section className="container mx-auto px-4 py-12 bg-gray-50 rounded-xl my-8">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-8">
+      <section className="relative mx-auto w-full max-w-2xl px-7 py-10">
+        <h2 className="font-serif-jp text-[22px] font-medium leading-[1.4]">
           診断の流れ
         </h2>
 
-        <div className="flex flex-col md:flex-row justify-center items-center gap-8 max-w-4xl mx-auto">
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-500 text-white flex items-center justify-center text-xl font-bold mx-auto mb-3">
-              1
+        <div className="mt-6 flex flex-col gap-3">
+          {TIPS.map(([title, sub]) => (
+            <div
+              key={title}
+              className="flex items-center gap-3 rounded-2xl bg-[var(--koi-bg-card)] px-4 py-3 shadow-[0_1px_0_var(--koi-line)]"
+            >
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-[var(--koi-primary-soft)] text-[var(--koi-primary-deep)]">
+                <CheckIcon className="h-3.5 w-3.5" />
+              </div>
+              <div>
+                <div className="text-[13px] font-semibold leading-tight">
+                  {title}
+                </div>
+                <div className="text-[11px] text-[var(--koi-ink-soft)]">
+                  {sub}
+                </div>
+              </div>
             </div>
-            <h3 className="font-semibold mb-1">質問に回答</h3>
-            <p className="text-sm text-gray-600">44問の質問に答えます</p>
-          </div>
-
-          <div className="hidden md:block text-gray-300 text-3xl">→</div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-500 text-white flex items-center justify-center text-xl font-bold mx-auto mb-3">
-              2
-            </div>
-            <h3 className="font-semibold mb-1">AIが分析</h3>
-            <p className="text-sm text-gray-600">回答をAIが詳細に分析</p>
-          </div>
-
-          <div className="hidden md:block text-gray-300 text-3xl">→</div>
-
-          <div className="text-center">
-            <div className="w-12 h-12 rounded-full bg-rose-500 text-white flex items-center justify-center text-xl font-bold mx-auto mb-3">
-              3
-            </div>
-            <h3 className="font-semibold mb-1">結果を確認</h3>
-            <p className="text-sm text-gray-600">タイプと相性がわかる</p>
-          </div>
+          ))}
         </div>
       </section>
 
       {/* CTA */}
-      <section className="container mx-auto px-4 py-16 text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          あなたの恋愛タイプを知ろう
-        </h2>
-        <p className="text-gray-600 mb-8">
-          約5分で完了。無料で診断できます。
-        </p>
-        <Link href="/diagnosis">
-          <Button size="lg" className="text-lg px-8 py-6 bg-rose-500 hover:bg-rose-600">
-            <Sparkles className="mr-2 h-5 w-5" />
-            診断を始める
-          </Button>
-        </Link>
+      <section className="relative mx-auto w-full max-w-2xl px-7 py-14">
+        <div className="relative overflow-hidden rounded-[28px] bg-[var(--koi-bg-card)] px-7 py-9 text-center shadow-[0_2px_8px_var(--koi-line)]">
+          <div className="absolute -left-10 -top-10 h-32 w-32 rounded-full bg-[var(--koi-primary-soft)] opacity-60" />
+          <div className="absolute -bottom-8 -right-8 h-28 w-28 rounded-full bg-[var(--koi-accent)] opacity-40" />
+          <div className="relative">
+            <h2 className="font-serif-jp text-[22px] font-medium leading-[1.5]">
+              あなたの恋ごころを、
+              <br />
+              見つけにいきましょう。
+            </h2>
+            <p className="mt-3 text-[12px] text-[var(--koi-ink-soft)]">
+              無料・登録不要・約3分
+            </p>
+            <Link
+              href="/diagnosis/start"
+              className="mt-6 inline-flex h-12 items-center justify-center rounded-[24px] bg-[var(--koi-ink)] px-8 text-[14px] font-semibold tracking-[0.04em] text-white"
+            >
+              診断をはじめる
+            </Link>
+          </div>
+        </div>
       </section>
 
       {/* Footer */}
-      <footer className="container mx-auto px-4 py-8 text-center text-sm text-gray-500 border-t">
+      <footer className="relative mx-auto w-full max-w-2xl px-7 pb-10 text-center text-[11px] text-[var(--koi-ink-muted)]">
         <p>
-          この診断は心理学研究に基づいていますが、エンターテインメント目的です。
+          この診断はエンターテインメント目的のものです。
         </p>
       </footer>
     </main>

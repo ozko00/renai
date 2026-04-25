@@ -6,7 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-zen-maru-gothic), var(--font-noto-sans-jp), system-ui, sans-serif;
+  --font-serif: var(--font-noto-serif-jp), serif;
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -41,6 +42,19 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* koigokoro design tokens — sky theme */
+  --color-koi-bg: var(--koi-bg);
+  --color-koi-bg-soft: var(--koi-bg-soft);
+  --color-koi-bg-card: var(--koi-bg-card);
+  --color-koi-ink: var(--koi-ink);
+  --color-koi-ink-soft: var(--koi-ink-soft);
+  --color-koi-ink-muted: var(--koi-ink-muted);
+  --color-koi-primary: var(--koi-primary);
+  --color-koi-primary-soft: var(--koi-primary-soft);
+  --color-koi-primary-deep: var(--koi-primary-deep);
+  --color-koi-accent: var(--koi-accent);
+  --color-koi-line: var(--koi-line);
 }
 
 :root {
@@ -76,6 +90,19 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* koigokoro — sky theme (default) */
+  --koi-bg: #F4F7FB;
+  --koi-bg-soft: #E3EBF2;
+  --koi-bg-card: #FFFFFF;
+  --koi-ink: #202530;
+  --koi-ink-soft: #5F6878;
+  --koi-ink-muted: #9BA5B5;
+  --koi-primary: #A3BAD4;
+  --koi-primary-soft: #CEDAE9;
+  --koi-primary-deep: #7593B5;
+  --koi-accent: #B8C8D4;
+  --koi-line: #DCE5EE;
 }
 
 .dark {
@@ -117,6 +144,17 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background: var(--koi-bg);
+    color: var(--koi-ink);
+    font-family: var(--font-zen-maru-gothic), "Hiragino Maru Gothic ProN", system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .font-serif-jp {
+    font-family: var(--font-noto-serif-jp), "Hiragino Mincho ProN", serif;
+  }
+  .font-maru {
+    font-family: var(--font-zen-maru-gothic), "Hiragino Maru Gothic ProN", system-ui, sans-serif;
   }
 }

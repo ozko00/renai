@@ -1,130 +1,81 @@
-// 愛着スタイル（4タイプ）
-export type AttachmentType = 'secure' | 'preoccupied' | 'dismissive' | 'fearful';
+// 4 軸 (LF=主導/受容, PS=情熱/安定, WA=言葉/行動, IE=自由/一途)
+export type KoigokoroAxis = 'LF' | 'PS' | 'WA' | 'IE';
 
-// 愛のスタイル（6タイプ）
-export type LoveStyleType = 'eros' | 'ludus' | 'storge' | 'pragma' | 'mania' | 'agape';
+// 16 タイプコード (各軸の前者を選んだ場合のみ L/P/W/I、後者なら F/S/A/E)
+export type KoigokoroCode =
+  | 'LPWI' | 'LPWE' | 'LPAI' | 'LPAE'
+  | 'LSWI' | 'LSWE' | 'LSAI' | 'LSAE'
+  | 'FPWI' | 'FPWE' | 'FPAI' | 'FPAE'
+  | 'FSWI' | 'FSWE' | 'FSAI' | 'FSAE';
 
-// 質問カテゴリ
-export type QuestionCategory = 'attachment' | 'loveStyle';
+// Likert 5 段階 (1=とてもそう思う ... 5=全く思わない)
+export type LikertValue = 1 | 2 | 3 | 4 | 5;
 
 // 質問
-export interface Question {
-  id: string;
+export interface AxisQuestion {
+  id: number;
+  axis: KoigokoroAxis;
   text: string;
-  category: QuestionCategory;
-  targetType: AttachmentType | LoveStyleType;
-  isReversed?: boolean;
+  // reverse=true なら値を反転して集計 (現状は全問 reverse=false)
+  reverse?: boolean;
 }
 
-// 回答
-export interface Answer {
-  questionId: string;
-  value: 1 | 2 | 3 | 4 | 5;
+// 回答 (1問1値)
+export type AxisAnswers = Record<number, LikertValue>;
+
+// 各軸のスコア (-1.0 .. +1.0、+方向 = 軸前者)
+export type AxisScores = Record<KoigokoroAxis, number>;
+
+// 16 タイプ情報
+export interface KoigokoroType {
+  code: KoigokoroCode;
+  name: string;
+  emoji: string;
+  tone: string; // tone color hex
+  desc: string;
+  short: string;
 }
 
-// スコア
-export interface AttachmentScores {
-  secure: number;
-  preoccupied: number;
-  dismissive: number;
-  fearful: number;
-}
-
-export interface LoveStyleScores {
-  eros: number;
-  ludus: number;
-  storge: number;
-  pragma: number;
-  mania: number;
-  agape: number;
-}
-
-// AI分析結果
-export interface AttachmentAnalysis {
-  primaryType: AttachmentType;
-  description: string;
-  strengths: string[];
-  challenges: string[];
-  growthAdvice: string;
-}
-
-export interface LoveStyleAnalysis {
-  primaryType: LoveStyleType;
-  secondaryType?: LoveStyleType;
-  description: string;
-  relationshipPattern: string;
-  compatibleStyles: string[];
-}
-
-export interface OverallProfile {
-  summary: string;
-  idealPartner: string;
-  warningPatterns: string;
-}
-
-// 診断結果
+// 診断結果 (新スキーマ v2)
 export interface DiagnosisResult {
-  scores: {
-    attachment: AttachmentScores;
-    loveStyle: LoveStyleScores;
-  };
-  analysis: {
-    attachmentAnalysis: AttachmentAnalysis;
-    loveStyleAnalysis: LoveStyleAnalysis;
-    overallProfile: OverallProfile;
-    recommendations: string[];
-  };
+  version: 2;
+  code: KoigokoroCode;
+  name: string;
+  emoji: string;
+  axes: AxisScores;
+  summary: string;
+  advice: string[];
 }
 
-// 相性情報
-export interface CompatibilityInfo {
-  score: number;
-  label: string;
-  description: string;
-}
+// 旧スキーマ (マイグレーション専用)
+export type LegacyAttachmentType = 'secure' | 'preoccupied' | 'dismissive' | 'fearful';
+export type LegacyLoveStyleType = 'eros' | 'ludus' | 'storge' | 'pragma' | 'mania' | 'agape';
 
-// 相性診断モード
-export type CompatibilityMode = 'general' | 'specific';
+export interface LegacyDiagnosisResult {
+  scores?: {
+    attachment?: Record<LegacyAttachmentType, number>;
+    loveStyle?: Record<LegacyLoveStyleType, number>;
+  };
+  analysis?: {
+    attachmentAnalysis?: { primaryType?: LegacyAttachmentType };
+    loveStyleAnalysis?: { primaryType?: LegacyLoveStyleType };
+  };
+}
 
 // 相性診断結果
-export interface CompatibilityResult {
-  overallCompatibility: {
-    score: number;
-    summary: string;
-  };
-  attachmentCompatibility: {
-    score: number;
-    analysis: string;
-    dynamics: string;
-  };
-  loveStyleCompatibility: {
-    score: number;
-    analysis: string;
-    strengths: string[];
-    challenges: string[];
-  };
-  communication: {
-    tips: string[];
-    avoidPatterns: string[];
-  };
-  longTermAdvice: string;
+export interface CompatibilityAxisAnalysis {
+  axis: KoigokoroAxis;
+  match: boolean;
+  selfLabel: string;
+  otherLabel: string;
+  comment: string;
 }
 
-// 一般相性結果
-export interface GeneralCompatibilityResult {
-  bestMatches: {
-    attachmentType: AttachmentType;
-    loveStyleType: LoveStyleType;
-    compatibilityScore: number;
-    reason: string;
-    tips: string[];
-  }[];
-  challengingMatches: {
-    attachmentType: AttachmentType;
-    loveStyleType: LoveStyleType;
-    compatibilityScore: number;
-    challenges: string;
-    solutions: string[];
-  }[];
-  generalAdvice: string;
+export interface CompatibilityResult {
+  selfCode: KoigokoroCode;
+  otherCode: KoigokoroCode;
+  score: number; // 0..100
+  tone: string;
+  axes: CompatibilityAxisAnalysis[];
+  summary: string;
 }

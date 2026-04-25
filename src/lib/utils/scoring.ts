@@ -1,85 +1,70 @@
 import {
-  Answer,
-  AttachmentScores,
-  LoveStyleScores,
-  AttachmentType,
-  LoveStyleType,
+  AxisAnswers,
+  AxisScores,
+  KoigokoroAxis,
+  KoigokoroCode,
+  LikertValue,
 } from '@/types/diagnosis';
-import { allQuestions } from '@/data/questions';
+import { axisQuestions } from '@/data/questions/axisQuestions';
 
-export function calculateScores(answers: Answer[]): {
-  attachmentScores: AttachmentScores;
-  loveStyleScores: LoveStyleScores;
-} {
-  // 初期化
-  const attachmentScores: AttachmentScores = {
-    secure: 0,
-    preoccupied: 0,
-    dismissive: 0,
-    fearful: 0,
-  };
+// 軸ごとに「+方向 = 軸前者」の符号で 4文字コードを組み立てる
+const POSITIVE_LETTER: Record<KoigokoroAxis, string> = {
+  LF: 'L',
+  PS: 'P',
+  WA: 'W',
+  IE: 'I',
+};
+const NEGATIVE_LETTER: Record<KoigokoroAxis, string> = {
+  LF: 'F',
+  PS: 'S',
+  WA: 'A',
+  IE: 'E',
+};
 
-  const loveStyleScores: LoveStyleScores = {
-    eros: 0,
-    ludus: 0,
-    storge: 0,
-    pragma: 0,
-    mania: 0,
-    agape: 0,
-  };
+const AXIS_ORDER: ReadonlyArray<KoigokoroAxis> = ['LF', 'PS', 'WA', 'IE'];
 
-  // 回答をマップに変換
-  const answerMap = new Map(answers.map((a) => [a.questionId, a.value]));
+// Likert 1=とてもそう思う, 5=全く思わない を -2..+2 に変換
+function likertToSigned(value: LikertValue, reverse: boolean): number {
+  const signed = 3 - value; // 1 -> +2, 3 -> 0, 5 -> -2
+  return reverse ? -signed : signed;
+}
 
-  // 各質問のスコアを集計
-  for (const question of allQuestions) {
-    const value = answerMap.get(question.id);
-    if (value === undefined) continue;
+export function calculateAxisScores(answers: AxisAnswers): AxisScores {
+  const sums: AxisScores = { LF: 0, PS: 0, WA: 0, IE: 0 };
+  const counts: Record<KoigokoroAxis, number> = { LF: 0, PS: 0, WA: 0, IE: 0 };
 
-    // 逆転項目の処理
-    const score = question.isReversed ? 6 - value : value;
-
-    if (question.category === 'attachment') {
-      const type = question.targetType as AttachmentType;
-      attachmentScores[type] += score;
-    } else {
-      const type = question.targetType as LoveStyleType;
-      loveStyleScores[type] += score;
-    }
+  for (const q of axisQuestions) {
+    const v = answers[q.id];
+    if (v === undefined) continue;
+    sums[q.axis] += likertToSigned(v, q.reverse ?? false);
+    counts[q.axis] += 1;
   }
 
-  return { attachmentScores, loveStyleScores };
-}
-
-export function getPrimaryAttachmentType(scores: AttachmentScores): AttachmentType {
-  const entries = Object.entries(scores) as [AttachmentType, number][];
-  entries.sort((a, b) => b[1] - a[1]);
-  return entries[0][0];
-}
-
-export function getPrimaryLoveStyleType(scores: LoveStyleScores): LoveStyleType {
-  const entries = Object.entries(scores) as [LoveStyleType, number][];
-  entries.sort((a, b) => b[1] - a[1]);
-  return entries[0][0];
-}
-
-export function getSecondaryLoveStyleType(scores: LoveStyleScores): LoveStyleType | undefined {
-  const entries = Object.entries(scores) as [LoveStyleType, number][];
-  entries.sort((a, b) => b[1] - a[1]);
-
-  // 2位が1位の70%以上のスコアなら表示
-  if (entries[1][1] >= entries[0][1] * 0.7) {
-    return entries[1][0];
+  const result: AxisScores = { LF: 0, PS: 0, WA: 0, IE: 0 };
+  for (const axis of AXIS_ORDER) {
+    const max = counts[axis] * 2; // 1問あたり最大±2
+    result[axis] = max === 0 ? 0 : sums[axis] / max;
   }
-  return undefined;
+  return result;
 }
 
-// スコアをパーセンテージに変換（愛着スタイル: 最大25点）
-export function attachmentScoreToPercent(score: number): number {
-  return Math.round((score / 25) * 100);
+export function codeFromAxes(scores: AxisScores): KoigokoroCode {
+  const code = AXIS_ORDER.map((axis) =>
+    scores[axis] >= 0 ? POSITIVE_LETTER[axis] : NEGATIVE_LETTER[axis]
+  ).join('');
+  return code as KoigokoroCode;
 }
 
-// スコアをパーセンテージに変換（愛のスタイル: 最大20点）
-export function loveStyleScoreToPercent(score: number): number {
-  return Math.round((score / 20) * 100);
+// -1..+1 を 0..100 に変換 (中央 = 50)
+export function axisToBarPercent(score: number): number {
+  const clamped = Math.max(-1, Math.min(1, score));
+  return Math.round(((clamped + 1) / 2) * 100);
+}
+
+// 軸ラベルの強さを表示するための「軸前者寄りパーセント」(0..100)
+// 例: LF=0.8 → 主導 90% / 受け身 10%
+export function axisStrengthPercent(score: number): { positive: number; negative: number } {
+  const clamped = Math.max(-1, Math.min(1, score));
+  const positive = Math.round(((clamped + 1) / 2) * 100);
+  return { positive, negative: 100 - positive };
 }

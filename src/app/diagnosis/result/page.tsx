@@ -1,403 +1,341 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DiagnosisResult, AttachmentType, LoveStyleType } from '@/types/diagnosis';
-import { attachmentTypeInfo } from '@/data/types/attachmentTypes';
-import { loveStyleTypeInfo } from '@/data/types/loveStyleTypes';
-import LoveStyleRadarChart from '@/components/result/LoveStyleRadarChart';
-import AttachmentScoreBar from '@/components/result/AttachmentScoreBar';
+import type { DiagnosisResult } from '@/types/diagnosis';
+import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+import AxisScoreBar from '@/components/result/AxisScoreBar';
 import {
-  Heart,
-  Brain,
-  Sparkles,
-  Users,
-  ChevronLeft,
-  Share2,
-  RefreshCw,
-  Lightbulb,
-  AlertTriangle,
-  CheckCircle,
-  BookOpen,
-} from 'lucide-react';
+  isLegacyResult,
+  migrateLegacyResult,
+} from '@/lib/utils/legacyMigration';
+
+const RESULT_STORAGE_KEY = 'diagnosisResult';
+
+function ChevronLeftIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 5l-5 5 5 5" />
+    </svg>
+  );
+}
+
+function HeartIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 14 14" fill="currentColor" className={className} aria-hidden>
+      <path d="M7 12.5C7 12.5 1 9 1 5C1 3 2.5 1.5 4.5 1.5C5.7 1.5 6.6 2.2 7 3C7.4 2.2 8.3 1.5 9.5 1.5C11.5 1.5 13 3 13 5C13 9 7 12.5 7 12.5Z" />
+    </svg>
+  );
+}
+
+function SparkleIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 12 12" fill="currentColor" className={className} aria-hidden>
+      <path d="M6 0L7 5L12 6L7 7L6 12L5 7L0 6L5 5Z" />
+    </svg>
+  );
+}
+
+function isDiagnosisResult(value: unknown): value is DiagnosisResult {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    obj.version === 2 &&
+    typeof obj.code === 'string' &&
+    typeof obj.name === 'string' &&
+    typeof obj.emoji === 'string' &&
+    typeof obj.axes === 'object' &&
+    obj.axes !== null
+  );
+}
+
+function readStoredResultRaw(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(RESULT_STORAGE_KEY);
+}
+
+function subscribeToStorage(onChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener('storage', onChange);
+  return () => window.removeEventListener('storage', onChange);
+}
 
 export default function DiagnosisResultPage() {
   const router = useRouter();
-  const [result, setResult] = useState<DiagnosisResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const migratedRef = useRef(false);
+
+  const stored = useSyncExternalStore(
+    subscribeToStorage,
+    readStoredResultRaw,
+    () => null
+  );
+
+  const result = useMemo<DiagnosisResult | null>(() => {
+    if (stored === null) return null;
+    try {
+      const parsed: unknown = JSON.parse(stored);
+      if (isDiagnosisResult(parsed)) return parsed;
+      return null;
+    } catch {
+      return null;
+    }
+  }, [stored]);
+
+  // 旧スキーマの自動マイグレーション
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (migratedRef.current) return;
+    if (result) return;
+    const raw = window.localStorage.getItem(RESULT_STORAGE_KEY);
+    if (!raw) return;
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (!isLegacyResult(parsed)) return;
+      const newResult = migrateLegacyResult(parsed);
+      if (!newResult) return;
+      window.localStorage.setItem(
+        RESULT_STORAGE_KEY,
+        JSON.stringify(newResult)
+      );
+      migratedRef.current = true;
+      // useSyncExternalStore は localStorage の同タブ書き換えを検知しないため、
+      // storage event を手動で発火させて再描画
+      window.dispatchEvent(new StorageEvent('storage', { key: RESULT_STORAGE_KEY }));
+    } catch {
+      // 何もしない
+    }
+  }, [result]);
+
+  const mounted = typeof window !== 'undefined';
 
   useEffect(() => {
-    const stored = localStorage.getItem('diagnosisResult');
-    if (stored) {
-      try {
-        setResult(JSON.parse(stored));
-      } catch {
-        router.push('/diagnosis');
-      }
-    } else {
-      router.push('/diagnosis');
-    }
-    setLoading(false);
-  }, [router]);
+    if (!mounted) return;
+    if (result) return;
+    if (migratedRef.current) return;
+    // localStorage に何もない、もしくはマイグレ不可のとき
+    const raw = window.localStorage.getItem(RESULT_STORAGE_KEY);
+    if (raw && isLegacyResult(JSON.parse(raw) as unknown)) return;
+    router.replace('/diagnosis/start');
+  }, [mounted, result, router]);
 
-  if (loading || !result) {
+  if (!mounted || !result) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--koi-bg)]">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-rose-500 mx-auto mb-4" />
-          <p className="text-gray-600">読み込み中...</p>
+          <div
+            className="mx-auto mb-5 h-10 w-10 animate-spin rounded-full border-2 border-[var(--koi-primary-soft)] border-t-[var(--koi-primary-deep)]"
+            aria-hidden
+          />
+          <p className="font-serif-jp text-[14px] text-[var(--koi-ink-soft)]">
+            読み込んでいます…
+          </p>
         </div>
       </div>
     );
   }
 
-  const { scores, analysis } = result;
-  const attachmentType = analysis.attachmentAnalysis.primaryType as AttachmentType;
-  const loveStyleType = analysis.loveStyleAnalysis.primaryType as LoveStyleType;
-  const attachmentInfo = attachmentTypeInfo[attachmentType];
-  const loveStyleInfo = loveStyleTypeInfo[loveStyleType];
-
-  const shareText = `私の恋愛タイプは「${attachmentInfo.name}」×「${loveStyleInfo.name}」でした！\n\n恋愛タイプ診断で自分の恋愛パターンを分析してみよう`;
-  const shareUrl = typeof window !== 'undefined' ? window.location.origin : '';
-  const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
-  const lineShareUrl = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`;
+  const type = koigokoroTypes[result.code];
+  const accent = type.tone;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 to-white">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-20">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    <main className="min-h-screen bg-[var(--koi-bg-soft)] text-[var(--koi-ink)]">
+      <header className="sticky top-0 z-20 bg-[var(--koi-bg-soft)]/95 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-5 py-4 sm:px-7">
           <Link
             href="/"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full text-[var(--koi-ink-soft)] transition-colors hover:bg-[var(--koi-bg-card)]"
+            aria-label="トップへ戻る"
           >
-            <ChevronLeft className="h-5 w-5 mr-1" />
-            トップへ
+            <ChevronLeftIcon className="h-5 w-5" />
           </Link>
-          <div className="flex gap-2">
-            <a
-              href={twitterShareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="outline" size="sm">
-                <Share2 className="h-4 w-4 mr-1" />
-                Twitter
-              </Button>
-            </a>
-            <a
-              href={lineShareUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <Button variant="outline" size="sm">
-                LINE
-              </Button>
-            </a>
-          </div>
+          <span className="font-mono text-[11px] tracking-[0.22em] text-[var(--koi-ink-soft)]">
+            RESULT
+          </span>
+          <span className="w-9" aria-hidden />
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* Title */}
-        <div className="text-center mb-8">
-          <Sparkles className="h-12 w-12 text-rose-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">診断結果</h1>
-          <p className="text-gray-600">あなたの恋愛タイプが明らかになりました</p>
-        </div>
+      <div className="mx-auto w-full max-w-2xl px-5 pb-16 sm:px-7">
+        {/* Type hero */}
+        <article
+          className="relative mt-4 overflow-hidden rounded-[28px] p-7 shadow-[0_4px_24px_var(--koi-line)] sm:p-9"
+          style={{
+            background:
+              'linear-gradient(180deg, var(--koi-bg-card) 0%, var(--koi-bg-soft) 100%)',
+          }}
+        >
+          <div
+            className="absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-50 blur-2xl"
+            style={{ background: accent }}
+            aria-hidden
+          />
+          <div
+            className="absolute -bottom-12 -left-12 h-44 w-44 rounded-full opacity-40 blur-3xl"
+            style={{ background: 'var(--koi-primary-soft)' }}
+            aria-hidden
+          />
 
-        {/* Main Types */}
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          {/* Attachment Type */}
-          <Card className="border-2" style={{ borderColor: attachmentInfo.color }}>
-            <CardHeader className="text-center pb-2">
-              <Brain className="h-8 w-8 mx-auto mb-2" style={{ color: attachmentInfo.color }} />
-              <p className="text-sm text-gray-500">愛着スタイル</p>
-              <CardTitle className="text-2xl" style={{ color: attachmentInfo.color }}>
-                {attachmentInfo.name}
-              </CardTitle>
-              <p className="text-sm text-gray-500">{attachmentInfo.nameEn}</p>
-            </CardHeader>
-          </Card>
-
-          {/* Love Style Type */}
-          <Card className="border-2" style={{ borderColor: loveStyleInfo.color }}>
-            <CardHeader className="text-center pb-2">
-              <Heart className="h-8 w-8 mx-auto mb-2" style={{ color: loveStyleInfo.color }} />
-              <p className="text-sm text-gray-500">愛のスタイル</p>
-              <CardTitle className="text-2xl" style={{ color: loveStyleInfo.color }}>
-                {loveStyleInfo.name}
-              </CardTitle>
-              <p className="text-sm text-gray-500">{loveStyleInfo.nameEn}</p>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {/* Attachment Analysis */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Brain className="h-5 w-5 text-rose-500" />
-              愛着スタイル分析
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <p className="text-gray-700">{analysis.attachmentAnalysis.description}</p>
-
-            <AttachmentScoreBar scores={scores.attachment} primaryType={attachmentType} />
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-green-800 flex items-center gap-2 mb-2">
-                  <CheckCircle className="h-4 w-4" />
-                  強み
-                </h4>
-                <ul className="text-sm text-green-700 space-y-1">
-                  {analysis.attachmentAnalysis.strengths.map((s, i) => (
-                    <li key={i}>・{s}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="bg-amber-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  課題
-                </h4>
-                <ul className="text-sm text-amber-700 space-y-1">
-                  {analysis.attachmentAnalysis.challenges.map((c, i) => (
-                    <li key={i}>・{c}</li>
-                  ))}
-                </ul>
-              </div>
+          <div className="relative">
+            <div className="font-mono text-[10px] tracking-[0.28em] text-[var(--koi-ink-soft)]">
+              YOUR TYPE · {result.code}
             </div>
 
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-blue-800 flex items-center gap-2 mb-2">
-                <Lightbulb className="h-4 w-4" />
-                成長のアドバイス
-              </h4>
-              <p className="text-sm text-blue-700">{analysis.attachmentAnalysis.growthAdvice}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Love Style Analysis */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Heart className="h-5 w-5 text-rose-500" />
-              愛のスタイル分析
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <LoveStyleRadarChart scores={scores.loveStyle} />
-
-            <div className="text-center">
-              <span className="inline-block px-4 py-2 rounded-full text-sm font-medium" style={{ backgroundColor: `${loveStyleInfo.color}20`, color: loveStyleInfo.color }}>
-                メイン: {loveStyleInfo.name}
-                {analysis.loveStyleAnalysis.secondaryType && (
-                  <span className="ml-2">
-                    / サブ: {loveStyleTypeInfo[analysis.loveStyleAnalysis.secondaryType as LoveStyleType]?.name}
-                  </span>
-                )}
-              </span>
+            <div
+              className="mt-6 flex h-24 w-24 items-center justify-center rounded-full text-[42px] shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
+              style={{ background: 'var(--koi-bg-card)' }}
+              aria-hidden
+            >
+              {result.emoji}
             </div>
 
-            <p className="text-gray-700">{analysis.loveStyleAnalysis.description}</p>
-
-            <div className="bg-rose-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-rose-800 mb-2">恋愛パターンの傾向</h4>
-              <p className="text-sm text-rose-700">{analysis.loveStyleAnalysis.relationshipPattern}</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Overall Profile */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-rose-500" />
-              総合分析
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-700">{analysis.overallProfile.summary}</p>
-
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-purple-800 flex items-center gap-2 mb-2">
-                  <Users className="h-4 w-4" />
-                  理想のパートナー像
-                </h4>
-                <p className="text-sm text-purple-700">{analysis.overallProfile.idealPartner}</p>
-              </div>
-              <div className="bg-orange-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-orange-800 flex items-center gap-2 mb-2">
-                  <AlertTriangle className="h-4 w-4" />
-                  注意パターン
-                </h4>
-                <p className="text-sm text-orange-700">{analysis.overallProfile.warningPatterns}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recommendations */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Lightbulb className="h-5 w-5 text-rose-500" />
-              アドバイス
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {analysis.recommendations.map((rec, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-sm font-medium">
-                    {i + 1}
-                  </span>
-                  <span className="text-gray-700">{rec}</span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* Compatibility CTA */}
-        <div className="bg-gradient-to-r from-rose-100 to-pink-100 rounded-xl p-6 mb-8 text-center">
-          <p className="text-gray-700 mb-3">あなたと相性の良いタイプを調べよう</p>
-          <Link href="/compatibility">
-            <Button size="lg" className="bg-rose-500 hover:bg-rose-600 shadow-lg">
-              <Users className="mr-2 h-5 w-5" />
-              相性を診断する
-            </Button>
-          </Link>
-        </div>
-
-        {/* About Attachment Styles */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-rose-500" />
-              愛着スタイルとは？
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-700 text-sm">
-              愛着スタイルは、幼少期の親との関係から形成される、親密な関係における行動パターンです。
-              心理学者のBowlbyとAinsworthの研究が基盤となっています。
+            <h1
+              className="font-serif-jp mt-6 text-[34px] font-medium leading-[1.2] tracking-[-0.01em] sm:text-[42px]"
+              style={{ color: accent }}
+            >
+              {type.name}
+            </h1>
+            <p className="mt-2 text-[13px] tracking-[0.04em] text-[var(--koi-ink-soft)]">
+              {type.short}
             </p>
-            <div className="grid gap-3">
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: attachmentTypeInfo.secure.color }} />
-                <div>
-                  <p className="font-medium text-sm">安定型（Secure）</p>
-                  <p className="text-xs text-gray-600">信頼関係を築きやすく、親密さと自立のバランスが取れている</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: attachmentTypeInfo.preoccupied.color }} />
-                <div>
-                  <p className="font-medium text-sm">不安型（Preoccupied）</p>
-                  <p className="text-xs text-gray-600">愛情確認を求め、見捨てられる不安を抱えやすい</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: attachmentTypeInfo.dismissive.color }} />
-                <div>
-                  <p className="font-medium text-sm">回避型（Dismissive）</p>
-                  <p className="text-xs text-gray-600">独立性を重視し、感情的な距離を保つ傾向</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: attachmentTypeInfo.fearful.color }} />
-                <div>
-                  <p className="font-medium text-sm">恐れ・回避型（Fearful）</p>
-                  <p className="text-xs text-gray-600">親密さを求めながらも、傷つくことを恐れて距離を置く</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* About Love Styles */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-rose-500" />
-              愛のスタイルとは？
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-gray-700 text-sm">
-              愛のスタイルは、社会学者John Alan Leeが提唱した「愛の色彩理論」に基づく、
-              恋愛における態度・アプローチの分類です。
+            <p className="mt-6 text-[14px] leading-[1.95] text-[var(--koi-ink)]">
+              {result.summary}
             </p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: loveStyleTypeInfo.eros.color }} />
-                <div>
-                  <p className="font-medium text-sm">情熱型（Eros）</p>
-                  <p className="text-xs text-gray-600">強い身体的・感情的魅力に基づく情熱的な愛</p>
-                </div>
+          </div>
+        </article>
+
+        {/* Compatibility CTA — top */}
+        <Link
+          href="/compatibility"
+          className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-[var(--koi-bg-card)] px-5 py-4 shadow-[0_2px_8px_var(--koi-line)] transition-transform hover:-translate-y-0.5"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--koi-primary-soft)] text-[var(--koi-primary-deep)]">
+              <HeartIcon className="h-4 w-4" />
+            </span>
+            <div>
+              <div className="text-[13px] font-semibold leading-tight">
+                相性のいいタイプを見る
               </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: loveStyleTypeInfo.ludus.color }} />
-                <div>
-                  <p className="font-medium text-sm">遊戯型（Ludus）</p>
-                  <p className="text-xs text-gray-600">恋愛をゲームや楽しみとして捉える軽やかな恋愛</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: loveStyleTypeInfo.storge.color }} />
-                <div>
-                  <p className="font-medium text-sm">友愛型（Storge）</p>
-                  <p className="text-xs text-gray-600">友情から発展する穏やかで安定した愛</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: loveStyleTypeInfo.pragma.color }} />
-                <div>
-                  <p className="font-medium text-sm">実用型（Pragma）</p>
-                  <p className="text-xs text-gray-600">論理的・実用的な視点でパートナーを選ぶ</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: loveStyleTypeInfo.mania.color }} />
-                <div>
-                  <p className="font-medium text-sm">熱狂型（Mania）</p>
-                  <p className="text-xs text-gray-600">強い執着と感情の波が特徴的、嫉妬や独占欲が強い</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                <div className="w-3 h-3 rounded-full mt-1.5" style={{ backgroundColor: loveStyleTypeInfo.agape.color }} />
-                <div>
-                  <p className="font-medium text-sm">博愛型（Agape）</p>
-                  <p className="text-xs text-gray-600">無条件の献身的な愛、見返りを求めない</p>
-                </div>
+              <div className="text-[11px] text-[var(--koi-ink-soft)]">
+                16タイプどうしの相性を診断
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          <span className="text-[var(--koi-ink-muted)]" aria-hidden>
+            →
+          </span>
+        </Link>
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link href="/compatibility">
-            <Button size="lg" className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600">
-              <Users className="mr-2 h-5 w-5" />
+        {/* Axis scores */}
+        <section className="mt-10">
+          <div className="mb-5">
+            <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+              01 · AXES
+            </div>
+            <h2 className="font-serif-jp mt-1.5 text-[20px] font-medium leading-[1.4]">
+              4 つの軸で見るあなた
+            </h2>
+          </div>
+          <div className="rounded-3xl bg-[var(--koi-bg-card)] p-6 shadow-[0_2px_8px_var(--koi-line)] sm:p-7">
+            <AxisScoreBar axes={result.axes} />
+          </div>
+        </section>
+
+        {/* Advice */}
+        {result.advice.length > 0 && (
+          <section className="mt-10">
+            <div className="mb-5">
+              <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+                02 · ADVICE
+              </div>
+              <h2 className="font-serif-jp mt-1.5 text-[20px] font-medium leading-[1.4]">
+                あなたへのことば
+              </h2>
+            </div>
+            <div className="rounded-3xl bg-[var(--koi-bg-card)] p-6 shadow-[0_2px_8px_var(--koi-line)] sm:p-7">
+              <ul className="space-y-4">
+                {result.advice.map((line, i) => (
+                  <li key={i} className="flex items-start gap-4">
+                    <span className="font-serif-jp flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[var(--koi-primary-soft)] text-[14px] font-medium text-[var(--koi-primary-deep)]">
+                      {i + 1}
+                    </span>
+                    <p className="pt-1 text-[13px] leading-[1.9] text-[var(--koi-ink)]">
+                      {line}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
+
+        {/* Compatibility CTA — bottom */}
+        <section className="relative mt-12 overflow-hidden rounded-[28px] bg-[var(--koi-bg-card)] px-7 py-9 text-center shadow-[0_2px_8px_var(--koi-line)]">
+          <div
+            className="absolute -left-10 -top-10 h-32 w-32 rounded-full opacity-50"
+            style={{ background: 'var(--koi-primary-soft)' }}
+            aria-hidden
+          />
+          <div
+            className="absolute -bottom-8 -right-8 h-28 w-28 rounded-full opacity-40"
+            style={{ background: accent }}
+            aria-hidden
+          />
+          <div className="relative">
+            <SparkleIcon
+              className="mx-auto h-3 w-3 text-[var(--koi-primary-deep)]"
+              aria-hidden
+            />
+            <h2 className="font-serif-jp mt-3 text-[22px] font-medium leading-[1.5]">
+              相性のいい人を
+              <br />
+              見つけにいきましょう
+            </h2>
+            <p className="mt-2 text-[12px] text-[var(--koi-ink-soft)]">
+              気になる人のタイプを入れて診断
+            </p>
+            <Link
+              href="/compatibility"
+              className="mt-6 inline-flex h-12 items-center justify-center rounded-[24px] bg-[var(--koi-ink)] px-8 text-[14px] font-semibold tracking-[0.04em] text-white"
+            >
               相性を診断する
-            </Button>
+            </Link>
+          </div>
+        </section>
+
+        {/* Bottom actions */}
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <Link
+            href="/diagnosis/share"
+            className="flex h-14 w-full items-center justify-center rounded-[28px] bg-[var(--koi-ink)] text-[14px] font-semibold tracking-[0.04em] text-white shadow-[0_8px_20px_var(--koi-primary-soft)] sm:max-w-xs"
+          >
+            シェアカードを作る
           </Link>
-          <Link href="/diagnosis">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto">
-              <RefreshCw className="mr-2 h-5 w-5" />
+          <div className="flex items-center gap-5 text-[12px] text-[var(--koi-ink-soft)]">
+            <Link href="/types" className="underline-offset-4 hover:underline">
+              16タイプを見る
+            </Link>
+            <span aria-hidden className="text-[var(--koi-ink-muted)]">
+              ·
+            </span>
+            <Link
+              href="/diagnosis/start"
+              className="underline-offset-4 hover:underline"
+            >
               もう一度診断する
-            </Button>
-          </Link>
+            </Link>
+          </div>
         </div>
       </div>
     </main>

@@ -1,449 +1,309 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { AttachmentType, LoveStyleType, CompatibilityResult, GeneralCompatibilityResult } from '@/types/diagnosis';
-import { attachmentTypeInfo } from '@/data/types/attachmentTypes';
-import { loveStyleTypeInfo } from '@/data/types/loveStyleTypes';
+import type {
+  CompatibilityResult,
+  KoigokoroCode,
+} from '@/types/diagnosis';
+import { koigokoroTypes } from '@/data/types/koigokoroTypes';
 import {
-  ChevronLeft,
-  Users,
-  Heart,
-  Share2,
-  RefreshCw,
-  CheckCircle,
-  AlertTriangle,
-  MessageCircle,
-  Sparkles,
-  Star,
-} from 'lucide-react';
+  calculateCompatibility,
+  isKoigokoroCode,
+} from '@/lib/utils/compatibility';
 
-interface StoredResult {
-  mode: 'general' | 'specific';
-  userAttachment: AttachmentType;
-  userLoveStyle: LoveStyleType;
-  partnerAttachment?: AttachmentType;
-  partnerLoveStyle?: LoveStyleType;
-  result: CompatibilityResult | GeneralCompatibilityResult;
+const COMPATIBILITY_STORAGE_KEY = 'compatibilityRequest';
+
+interface StoredRequest {
+  selfCode: KoigokoroCode;
+  otherCode: KoigokoroCode;
+}
+
+function ChevronLeftIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden
+    >
+      <path d="M12 5l-5 5 5 5" />
+    </svg>
+  );
+}
+
+function HeartIcon({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 14 14" fill="currentColor" className={className} aria-hidden>
+      <path d="M7 12.5C7 12.5 1 9 1 5C1 3 2.5 1.5 4.5 1.5C5.7 1.5 6.6 2.2 7 3C7.4 2.2 8.3 1.5 9.5 1.5C11.5 1.5 13 3 13 5C13 9 7 12.5 7 12.5Z" />
+    </svg>
+  );
+}
+
+function parseRequest(raw: string | null): StoredRequest | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const obj = parsed as Record<string, unknown>;
+    if (!isKoigokoroCode(obj.selfCode) || !isKoigokoroCode(obj.otherCode)) {
+      return null;
+    }
+    return { selfCode: obj.selfCode, otherCode: obj.otherCode };
+  } catch {
+    return null;
+  }
+}
+
+let cachedRaw: string | null = null;
+let cachedRequest: StoredRequest | null = null;
+
+function getRequestSnapshot(): StoredRequest | null {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(COMPATIBILITY_STORAGE_KEY);
+  if (raw === cachedRaw) return cachedRequest;
+  cachedRaw = raw;
+  cachedRequest = parseRequest(raw);
+  return cachedRequest;
+}
+
+function getServerRequestSnapshot(): StoredRequest | null {
+  return null;
+}
+
+function subscribeRequest(callback: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const handler = (e: StorageEvent) => {
+    if (e.key === null || e.key === COMPATIBILITY_STORAGE_KEY) {
+      callback();
+    }
+  };
+  window.addEventListener('storage', handler);
+  return () => {
+    window.removeEventListener('storage', handler);
+  };
 }
 
 export default function CompatibilityResultPage() {
   const router = useRouter();
-  const [data, setData] = useState<StoredResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const request = useSyncExternalStore(
+    subscribeRequest,
+    getRequestSnapshot,
+    getServerRequestSnapshot
+  );
+
+  const hydrated = typeof window !== 'undefined';
 
   useEffect(() => {
-    const stored = localStorage.getItem('compatibilityResult');
-    if (stored) {
-      try {
-        setData(JSON.parse(stored));
-      } catch {
-        router.push('/compatibility');
-      }
-    } else {
-      router.push('/compatibility');
+    if (hydrated && !request) {
+      router.replace('/compatibility');
     }
-    setLoading(false);
-  }, [router]);
+  }, [hydrated, request, router]);
 
-  if (loading || !data) {
+  const result = useMemo<CompatibilityResult | null>(() => {
+    if (!request) return null;
+    return calculateCompatibility(request.selfCode, request.otherCode);
+  }, [request]);
+
+  if (!hydrated || !result) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[var(--koi-bg)]">
         <div className="text-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-rose-500 mx-auto mb-4" />
-          <p className="text-gray-600">読み込み中...</p>
+          <div
+            className="mx-auto mb-5 h-10 w-10 animate-spin rounded-full border-2 border-[var(--koi-primary-soft)] border-t-[var(--koi-primary-deep)]"
+            aria-hidden
+          />
+          <p className="font-serif-jp text-[14px] text-[var(--koi-ink-soft)]">
+            読み解いています…
+          </p>
         </div>
       </div>
     );
   }
 
-  const { mode, userAttachment, userLoveStyle, partnerAttachment, partnerLoveStyle, result } = data;
-  const userAttachmentInfo = attachmentTypeInfo[userAttachment];
-  const userLoveStyleInfo = loveStyleTypeInfo[userLoveStyle];
-
-  const handleShare = (platform: 'twitter' | 'line') => {
-    let text = '';
-    if (mode === 'specific' && partnerAttachment && partnerLoveStyle) {
-      const partnerAttachmentInfo = attachmentTypeInfo[partnerAttachment];
-      const partnerLoveStyleInfo = loveStyleTypeInfo[partnerLoveStyle];
-      const score = (result as CompatibilityResult).overallCompatibility?.score || 0;
-      text = `私(${userAttachmentInfo.name}×${userLoveStyleInfo.name})と相手(${partnerAttachmentInfo.name}×${partnerLoveStyleInfo.name})の相性は${score}点でした！`;
-    } else {
-      text = `私の恋愛タイプ(${userAttachmentInfo.name}×${userLoveStyleInfo.name})に合う相性を診断しました！`;
-    }
-    text += '\n\n恋愛タイプ診断で相性をチェックしてみよう';
-    const url = window.location.origin;
-
-    if (platform === 'twitter') {
-      window.open(
-        `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
-        '_blank'
-      );
-    } else {
-      window.open(
-        `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`,
-        '_blank'
-      );
-    }
-  };
-
-  const renderScoreStars = (score: number, max: number = 5) => {
-    return (
-      <div className="flex gap-1">
-        {Array.from({ length: max }).map((_, i) => (
-          <Star
-            key={i}
-            className={`h-5 w-5 ${i < score ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-          />
-        ))}
-      </div>
-    );
-  };
+  const selfType = koigokoroTypes[result.selfCode];
+  const otherType = koigokoroTypes[result.otherCode];
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-rose-50 to-white">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur border-b sticky top-0 z-20">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+    <main className="min-h-screen bg-[var(--koi-bg-soft)] text-[var(--koi-ink)]">
+      <header className="sticky top-0 z-20 bg-[var(--koi-bg-soft)]/95 backdrop-blur-md">
+        <div className="mx-auto flex w-full max-w-2xl items-center justify-between px-5 py-4 sm:px-7">
           <Link
             href="/compatibility"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900"
+            className="-ml-2 flex h-9 w-9 items-center justify-center rounded-full text-[var(--koi-ink-soft)] transition-colors hover:bg-[var(--koi-bg-card)]"
+            aria-label="戻る"
           >
-            <ChevronLeft className="h-5 w-5 mr-1" />
-            戻る
+            <ChevronLeftIcon className="h-5 w-5" />
           </Link>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleShare('twitter')}
-            >
-              <Share2 className="h-4 w-4 mr-1" />
-              Twitter
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleShare('line')}
-            >
-              LINE
-            </Button>
-          </div>
+          <span className="font-mono text-[11px] tracking-[0.22em] text-[var(--koi-ink-soft)]">
+            COMPATIBILITY · RESULT
+          </span>
+          <span className="w-9" aria-hidden />
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-8 max-w-3xl">
-        {/* Title */}
-        <div className="text-center mb-8">
-          <Users className="h-12 w-12 text-rose-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">相性診断結果</h1>
-        </div>
-
-        {mode === 'specific' ? (
-          // Specific compatibility result
-          <SpecificResult
-            data={data}
-            result={result as CompatibilityResult}
-            renderScoreStars={renderScoreStars}
+      <section className="mx-auto w-full max-w-2xl px-5 pb-16 sm:px-7">
+        {/* Score hero */}
+        <article
+          className="relative mt-4 overflow-hidden rounded-[28px] p-7 shadow-[0_4px_24px_var(--koi-line)] sm:p-9"
+          style={{
+            background:
+              'linear-gradient(180deg, var(--koi-bg-card) 0%, var(--koi-bg-soft) 100%)',
+          }}
+        >
+          <div
+            className="absolute -right-12 -top-12 h-44 w-44 rounded-full opacity-40 blur-3xl"
+            style={{ background: selfType.tone }}
+            aria-hidden
           />
-        ) : (
-          // General compatibility result
-          <GeneralResult
-            data={data}
-            result={result as GeneralCompatibilityResult}
-            renderScoreStars={renderScoreStars}
+          <div
+            className="absolute -bottom-12 -left-12 h-44 w-44 rounded-full opacity-40 blur-3xl"
+            style={{ background: otherType.tone }}
+            aria-hidden
           />
-        )}
 
-        {/* Actions */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-          <Link href="/compatibility">
-            <Button size="lg" className="w-full sm:w-auto bg-rose-500 hover:bg-rose-600">
-              <Users className="mr-2 h-5 w-5" />
-              別の相性を診断
-            </Button>
-          </Link>
-          <Link href="/diagnosis/result">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto">
-              診断結果に戻る
-            </Button>
-          </Link>
-        </div>
-      </div>
-    </main>
-  );
-}
-
-function SpecificResult({
-  data,
-  result,
-  renderScoreStars,
-}: {
-  data: StoredResult;
-  result: CompatibilityResult;
-  renderScoreStars: (score: number, max?: number) => React.ReactNode;
-}) {
-  const { userAttachment, userLoveStyle, partnerAttachment, partnerLoveStyle } = data;
-  const userAttachmentInfo = attachmentTypeInfo[userAttachment];
-  const userLoveStyleInfo = loveStyleTypeInfo[userLoveStyle];
-  const partnerAttachmentInfo = partnerAttachment ? attachmentTypeInfo[partnerAttachment] : null;
-  const partnerLoveStyleInfo = partnerLoveStyle ? loveStyleTypeInfo[partnerLoveStyle] : null;
-
-  return (
-    <div className="space-y-6">
-      {/* Type Cards */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="text-center pb-2">
-            <p className="text-sm text-gray-500">あなた</p>
-            <CardTitle className="text-lg">
-              {userAttachmentInfo.name} × {userLoveStyleInfo.name}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardHeader className="text-center pb-2">
-            <p className="text-sm text-gray-500">相手</p>
-            <CardTitle className="text-lg">
-              {partnerAttachmentInfo?.name} × {partnerLoveStyleInfo?.name}
-            </CardTitle>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {/* Overall Score */}
-      <Card className="bg-gradient-to-br from-rose-500 to-pink-500 text-white">
-        <CardContent className="py-8 text-center">
-          <p className="text-rose-100 mb-2">総合相性スコア</p>
-          <p className="text-6xl font-bold mb-4">{result.overallCompatibility?.score || 0}</p>
-          <p className="text-rose-100">/100点</p>
-        </CardContent>
-      </Card>
-
-      {/* Summary */}
-      <Card>
-        <CardContent className="py-6">
-          <p className="text-gray-700">{result.overallCompatibility?.summary}</p>
-        </CardContent>
-      </Card>
-
-      {/* Attachment Compatibility */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            愛着スタイルの相性
-            {renderScoreStars(result.attachmentCompatibility?.score || 0)}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-gray-700">{result.attachmentCompatibility?.analysis}</p>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <p className="text-sm font-medium text-gray-600 mb-1">二人の力学</p>
-            <p className="text-gray-700">{result.attachmentCompatibility?.dynamics}</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Love Style Compatibility */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            愛のスタイルの相性
-            {renderScoreStars(result.loveStyleCompatibility?.score || 0)}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-gray-700">{result.loveStyleCompatibility?.analysis}</p>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="bg-green-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-green-800 flex items-center gap-2 mb-2">
-                <CheckCircle className="h-4 w-4" />
-                二人の強み
-              </h4>
-              <ul className="text-sm text-green-700 space-y-1">
-                {result.loveStyleCompatibility?.strengths?.map((s, i) => (
-                  <li key={i}>・{s}</li>
-                ))}
-              </ul>
+          <div className="relative">
+            <div className="font-mono text-[10px] tracking-[0.28em] text-[var(--koi-ink-soft)]">
+              SCORE
             </div>
-            <div className="bg-amber-50 p-4 rounded-lg">
-              <h4 className="font-semibold text-amber-800 flex items-center gap-2 mb-2">
-                <AlertTriangle className="h-4 w-4" />
-                注意点
-              </h4>
-              <ul className="text-sm text-amber-700 space-y-1">
-                {result.loveStyleCompatibility?.challenges?.map((c, i) => (
-                  <li key={i}>・{c}</li>
-                ))}
-              </ul>
+
+            <div className="mt-4 flex items-baseline gap-2">
+              <span
+                className="font-serif-jp text-[64px] font-medium leading-none tracking-[-0.02em] sm:text-[80px]"
+                style={{ color: 'var(--koi-primary-deep)' }}
+              >
+                {result.score}
+              </span>
+              <span className="font-mono text-[12px] tracking-[0.18em] text-[var(--koi-ink-muted)]">
+                / 100
+              </span>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Communication */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <MessageCircle className="h-5 w-5 text-rose-500" />
-            コミュニケーション
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="bg-blue-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-blue-800 mb-2">コツ</h4>
-            <ul className="text-sm text-blue-700 space-y-1">
-              {result.communication?.tips?.map((t, i) => (
-                <li key={i}>・{t}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="bg-red-50 p-4 rounded-lg">
-            <h4 className="font-semibold text-red-800 mb-2">避けるべきパターン</h4>
-            <ul className="text-sm text-red-700 space-y-1">
-              {result.communication?.avoidPatterns?.map((p, i) => (
-                <li key={i}>・{p}</li>
-              ))}
-            </ul>
-          </div>
-        </CardContent>
-      </Card>
+            <p className="mt-5 text-[14px] leading-[1.95] text-[var(--koi-ink)]">
+              {result.tone}
+            </p>
 
-      {/* Long Term Advice */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-rose-500" />
-            長期的な関係のために
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-700">{result.longTermAdvice}</p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function GeneralResult({
-  data,
-  result,
-  renderScoreStars,
-}: {
-  data: StoredResult;
-  result: GeneralCompatibilityResult;
-  renderScoreStars: (score: number, max?: number) => React.ReactNode;
-}) {
-  const { userAttachment, userLoveStyle } = data;
-  const userAttachmentInfo = attachmentTypeInfo[userAttachment];
-  const userLoveStyleInfo = loveStyleTypeInfo[userLoveStyle];
-
-  return (
-    <div className="space-y-6">
-      {/* User Type */}
-      <Card>
-        <CardHeader className="text-center pb-2">
-          <p className="text-sm text-gray-500">あなたのタイプ</p>
-          <CardTitle className="text-xl">
-            {userAttachmentInfo.name} × {userLoveStyleInfo.name}
-          </CardTitle>
-        </CardHeader>
-      </Card>
-
-      {/* Best Matches */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Heart className="h-5 w-5 text-rose-500" />
-            相性の良いタイプ
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {result.bestMatches?.map((match, i) => {
-            const attachmentInfo = attachmentTypeInfo[match.attachmentType as AttachmentType];
-            const loveStyleInfo = loveStyleTypeInfo[match.loveStyleType as LoveStyleType];
-            return (
-              <div key={i} className="border rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-semibold">
-                      {attachmentInfo?.name} × {loveStyleInfo?.name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      相性スコア: {match.compatibilityScore}点
-                    </p>
+            <div className="mt-7 flex items-center gap-3">
+              <div className="flex flex-1 items-center gap-3 rounded-2xl bg-[var(--koi-bg)] p-3">
+                <span className="text-[24px]" aria-hidden>
+                  {selfType.emoji}
+                </span>
+                <div className="min-w-0">
+                  <div className="font-mono text-[9px] tracking-[0.18em] text-[var(--koi-ink-muted)]">
+                    {selfType.code}
                   </div>
-                  <span className="text-2xl font-bold text-rose-500">
-                    #{i + 1}
+                  <div className="font-serif-jp truncate text-[13px] font-medium">
+                    {selfType.name}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[var(--koi-primary-deep)]" aria-hidden>
+                <HeartIcon className="h-4 w-4" />
+              </span>
+              <div className="flex flex-1 items-center gap-3 rounded-2xl bg-[var(--koi-bg)] p-3">
+                <span className="text-[24px]" aria-hidden>
+                  {otherType.emoji}
+                </span>
+                <div className="min-w-0">
+                  <div className="font-mono text-[9px] tracking-[0.18em] text-[var(--koi-ink-muted)]">
+                    {otherType.code}
+                  </div>
+                  <div className="font-serif-jp truncate text-[13px] font-medium">
+                    {otherType.name}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        {/* Summary */}
+        <section className="mt-10">
+          <div className="mb-5">
+            <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+              01 · OVERVIEW
+            </div>
+            <h2 className="font-serif-jp mt-1.5 text-[20px] font-medium leading-[1.4]">
+              ふたりの傾き
+            </h2>
+          </div>
+          <div className="rounded-3xl bg-[var(--koi-bg-card)] p-6 shadow-[0_2px_8px_var(--koi-line)] sm:p-7">
+            <p className="text-[14px] leading-[1.95] text-[var(--koi-ink)]">
+              {result.summary}
+            </p>
+          </div>
+        </section>
+
+        {/* Axis breakdown */}
+        <section className="mt-10">
+          <div className="mb-5">
+            <div className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+              02 · AXES
+            </div>
+            <h2 className="font-serif-jp mt-1.5 text-[20px] font-medium leading-[1.4]">
+              4 つの軸ごとの相性
+            </h2>
+          </div>
+          <ul className="flex flex-col gap-3">
+            {result.axes.map((axis) => (
+              <li
+                key={axis.axis}
+                className="rounded-3xl bg-[var(--koi-bg-card)] p-5 shadow-[0_2px_8px_var(--koi-line)] sm:p-6"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[10px] tracking-[0.22em] text-[var(--koi-ink-muted)]">
+                    {axis.axis}
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.1em] ${
+                      axis.match
+                        ? 'bg-[var(--koi-primary-soft)] text-[var(--koi-primary-deep)]'
+                        : 'bg-[var(--koi-bg-soft)] text-[var(--koi-ink-soft)]'
+                    }`}
+                  >
+                    {axis.match ? 'MATCH' : 'CONTRAST'}
                   </span>
                 </div>
-                <p className="text-gray-700 text-sm mb-3">{match.reason}</p>
-                <div className="bg-green-50 p-3 rounded">
-                  <p className="text-xs font-medium text-green-800 mb-1">うまくいくコツ</p>
-                  <ul className="text-sm text-green-700 space-y-1">
-                    {match.tips?.map((tip, j) => (
-                      <li key={j}>・{tip}</li>
-                    ))}
-                  </ul>
+                <div className="mt-3 flex items-center gap-2 text-[13px]">
+                  <span className="font-serif-jp font-medium">
+                    {axis.selfLabel}
+                  </span>
+                  <span className="text-[var(--koi-ink-muted)]" aria-hidden>
+                    ×
+                  </span>
+                  <span className="font-serif-jp font-medium">
+                    {axis.otherLabel}
+                  </span>
                 </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+                <p className="mt-2 text-[12px] leading-[1.85] text-[var(--koi-ink-soft)]">
+                  {axis.comment}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
-      {/* Challenging Matches */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            注意が必要なタイプ
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {result.challengingMatches?.map((match, i) => {
-            const attachmentInfo = attachmentTypeInfo[match.attachmentType as AttachmentType];
-            const loveStyleInfo = loveStyleTypeInfo[match.loveStyleType as LoveStyleType];
-            return (
-              <div key={i} className="border border-amber-200 bg-amber-50/50 rounded-lg p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="font-semibold">
-                    {attachmentInfo?.name} × {loveStyleInfo?.name}
-                  </p>
-                  <p className="text-sm text-amber-600">
-                    相性スコア: {match.compatibilityScore}点
-                  </p>
-                </div>
-                <p className="text-gray-700 text-sm mb-3">{match.challenges}</p>
-                <div className="bg-blue-50 p-3 rounded">
-                  <p className="text-xs font-medium text-blue-800 mb-1">乗り越えるヒント</p>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    {match.solutions?.map((sol, j) => (
-                      <li key={j}>・{sol}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {/* General Advice */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="h-5 w-5 text-rose-500" />
-            恋愛アドバイス
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-gray-700">{result.generalAdvice}</p>
-        </CardContent>
-      </Card>
-    </div>
+        {/* Bottom actions */}
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <Link
+            href="/compatibility"
+            className="flex h-12 items-center justify-center rounded-[24px] text-[13px] text-[var(--koi-ink-soft)] underline-offset-4 hover:underline"
+          >
+            別のタイプと診断する
+          </Link>
+          <Link
+            href="/diagnosis/result"
+            className="flex h-12 items-center justify-center rounded-[24px] text-[13px] text-[var(--koi-ink-soft)] underline-offset-4 hover:underline"
+          >
+            自分の結果に戻る
+          </Link>
+        </div>
+      </section>
+    </main>
   );
 }

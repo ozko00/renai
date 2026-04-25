@@ -1,73 +1,52 @@
-import { AttachmentScores, LoveStyleScores } from '@/types/diagnosis';
+import { AxisScores, KoigokoroCode } from '@/types/diagnosis';
+import { koigokoroTypes } from '@/data/types/koigokoroTypes';
+
+const AXIS_DESCRIPTION: Record<string, string> = {
+  LF: '主導(L) ↔ 受容(F)',
+  PS: '情熱(P) ↔ 安定(S)',
+  WA: '言葉(W) ↔ 行動(A)',
+  IE: '自由(I) ↔ 一途(E)',
+};
+
+function formatAxis(score: number): string {
+  const pct = Math.round(((score + 1) / 2) * 100);
+  return `${score >= 0 ? '+' : ''}${score.toFixed(2)} (前者寄り ${pct}%)`;
+}
 
 export function buildDiagnosisPrompt(
-  attachmentScores: AttachmentScores,
-  loveStyleScores: LoveStyleScores
+  code: KoigokoroCode,
+  axes: AxisScores
 ): string {
-  return `あなたは恋愛心理学の専門家です。以下の診断結果を分析し、パーソナライズされたアドバイスを提供してください。
+  const type = koigokoroTypes[code];
+  return `あなたは恋愛心理学に詳しい優しいカウンセラーです。
+ユーザーの恋愛タイプ診断結果から、温かく前向きなパーソナルメッセージを作成してください。
 
-## 愛着スタイルスコア（各5問×5点満点=25点満点）
-- 安定型 (Secure): ${attachmentScores.secure}/25
-- 不安型 (Preoccupied): ${attachmentScores.preoccupied}/25
-- 回避型 (Dismissive): ${attachmentScores.dismissive}/25
-- 恐れ・回避型 (Fearful): ${attachmentScores.fearful}/25
+## 診断結果
+- タイプコード: ${code}
+- タイプ名: ${type.name} ${type.emoji}
+- 一行表現: ${type.short}
+- 性格傾向: ${type.desc}
 
-## 愛のスタイルスコア（各4問×5点満点=20点満点）
-- Eros（情熱型）: ${loveStyleScores.eros}/20
-- Ludus（遊戯型）: ${loveStyleScores.ludus}/20
-- Storge（友愛型）: ${loveStyleScores.storge}/20
-- Pragma（実用型）: ${loveStyleScores.pragma}/20
-- Mania（熱狂型）: ${loveStyleScores.mania}/20
-- Agape（博愛型）: ${loveStyleScores.agape}/20
+## 4軸スコア (-1.0 ~ +1.0、+ 方向 = 軸前者)
+- LF (${AXIS_DESCRIPTION.LF}): ${formatAxis(axes.LF)}
+- PS (${AXIS_DESCRIPTION.PS}): ${formatAxis(axes.PS)}
+- WA (${AXIS_DESCRIPTION.WA}): ${formatAxis(axes.WA)}
+- IE (${AXIS_DESCRIPTION.IE}): ${formatAxis(axes.IE)}
 
-## タイプの説明
-愛着スタイル:
-- Secure（安定型）: 信頼関係を築きやすく、親密さと自立のバランスが取れている
-- Preoccupied（不安型）: 愛情確認を求め、見捨てられる不安を抱えやすい
-- Dismissive（回避型）: 独立性を重視し、感情的距離を保つ傾向
-- Fearful（恐れ・回避型）: 親密さを求めつつ、傷つくことを恐れる
-
-愛のスタイル:
-- Eros: 情熱的・身体的魅力重視
-- Ludus: 遊び心・軽やかな恋愛
-- Storge: 友情ベース・安定志向
-- Pragma: 論理的・条件重視
-- Mania: 執着的・感情の波が激しい
-- Agape: 無条件の献身的愛
-
-## 出力形式（厳密にこのJSON形式で出力してください）
+## 出力形式 (厳密にこのJSONのみ)
 {
-  "attachmentAnalysis": {
-    "primaryType": "secure|preoccupied|dismissive|fearful のいずれか（最高スコアのタイプ）",
-    "description": "あなたの愛着スタイルの特徴説明（200文字程度、日本語、「あなた」という二人称で書く）",
-    "strengths": ["強み1", "強み2", "強み3"],
-    "challenges": ["課題1", "課題2"],
-    "growthAdvice": "成長のためのアドバイス（150文字程度、日本語、「あなた」という二人称で書く）"
-  },
-  "loveStyleAnalysis": {
-    "primaryType": "eros|ludus|storge|pragma|mania|agape のいずれか（最高スコアのタイプ）",
-    "secondaryType": "2番目に高いスタイル（任意、1位の70%以上のスコアがある場合）",
-    "description": "あなたの愛のスタイルの特徴説明（200文字程度、日本語、「あなた」という二人称で書く）",
-    "relationshipPattern": "恋愛パターンの傾向（100文字程度、「あなた」という二人称で書く）",
-    "compatibleStyles": ["相性の良いスタイル1", "スタイル2"]
-  },
-  "overallProfile": {
-    "summary": "愛着スタイルと愛のスタイルを統合した総合分析（300文字程度、日本語、「あなた」という二人称で書く）",
-    "idealPartner": "理想的なパートナー像（150文字程度、日本語、「あなた」という二人称で書く）",
-    "warningPatterns": "注意すべき恋愛パターン（100文字程度、日本語、「あなた」という二人称で書く）"
-  },
-  "recommendations": [
-    "具体的なアドバイス1（50文字程度、「あなた」という二人称で書く）",
-    "具体的なアドバイス2（50文字程度、「あなた」という二人称で書く）",
-    "具体的なアドバイス3（50文字程度、「あなた」という二人称で書く）"
+  "summary": "${type.name}としてのあなたの恋愛観を、4軸スコアを踏まえて200文字程度で温かく描写。「あなた」二人称、日本語",
+  "advice": [
+    "短い具体アドバイス1 (40文字程度、二人称、行動可能な内容)",
+    "短い具体アドバイス2 (40文字程度)",
+    "短い具体アドバイス3 (40文字程度)"
   ]
 }
 
-注意事項:
-- 必ず上記のJSON形式のみを出力してください
-- 日本語で回答してください
-- 科学的根拠に基づいた分析を行ってください
-- ポジティブかつ建設的なトーンで書いてください
-- スコアを正確に分析し、最高スコアのタイプを primaryType として判定してください
-- 「このユーザー」「ユーザー」という表現は絶対に使わず、必ず「あなた」という二人称で書いてください`;
+注意:
+- 必ず上記 JSON のみを返す。前置きや説明は不要。
+- 「ユーザー」「あなた様」は使わず「あなた」で統一。
+- ポジティブで詩的な、けれど押しつけがましくないトーン。
+- スコアの極端に高い/低い軸があれば自然に言及する。
+- summary は型ステレオタイプの繰り返しではなく、軸スコアの個別性に触れる。`;
 }
